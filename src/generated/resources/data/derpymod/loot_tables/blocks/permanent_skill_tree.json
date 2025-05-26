@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "derpymod:permanent_skill_tree"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "derpymod:blocks/permanent_skill_tree"
+}

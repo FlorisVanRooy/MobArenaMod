@@ -1,0 +1,13 @@
+{
+  "item.derpymod.minigun": "Minigun",
+  "item.derpymod.example_item": "Example Food",
+  "item.derpymod.strong_zombie_spawn_egg": "Spawn Strong Zombie",
+  "item.derpymod.spawn_selector_wand": "Spawn Selector Wand",
+
+
+  "block.derpymod.upgrade_table": "Upgrade Table",
+  "block.derpymod.permanent_skill_tree": "Permanent Skill Tree",
+
+
+  "creativetab.derpy_tab": "Derpy Mod"
+}

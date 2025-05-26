@@ -1,0 +1,8 @@
+// 1.20.1	2024-07-13T20:36:03.3221007	Block States: derpymod
+0568fadfa93f9df28b6365b3290f0c9f91195721 assets/derpymod/blockstates/example_block.json
+ba7f5599be774d7b9d16a0cb366ba8b562d33cd6 assets/derpymod/blockstates/permanent_skill_tree.json
+33208abe675da69e97cebf6314780747705dd978 assets/derpymod/blockstates/upgrade_table.json
+bb425f47baf059c38c880cdaa39ecf0832bbc1d6 assets/derpymod/models/block/example_block.json
+eb4549543e9b99900ed5904086f3a2a04b6d9932 assets/derpymod/models/item/example_block.json
+3a02491faa254304e90f29b53eafcba8dbf151b9 assets/derpymod/models/item/permanent_skill_tree.json
+d1638a1f7fce9171c0b2eb274cacdba634c1e0a5 assets/derpymod/models/item/upgrade_table.json

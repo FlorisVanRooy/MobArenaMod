@@ -1,0 +1,4 @@
+// 1.20.1	2024-07-13T19:43:52.0565318	Loot Tables
+739707365424fa4fcb45df6d9bd899b798862387 data/derpymod/loot_tables/blocks/example_block.json
+236c4f1aba93a5658b212f9e4234491f9ead0246 data/derpymod/loot_tables/blocks/permanent_skill_tree.json
+0c5b75607773762a78066962c145248db08e074b data/derpymod/loot_tables/blocks/upgrade_table.json

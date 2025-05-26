@@ -1,0 +1,4 @@
+// 1.20.1	2024-07-01T19:17:26.4950499	Tags for minecraft:block mod id derpymod
+5e2b750a947bf6b0eabc3b4c4ea19d72a438905f data/minecraft/tags/blocks/mineable/pickaxe.json
+421fd4b9e7e1739d6a13d80ae462e956443f401a data/minecraft/tags/blocks/needs_diamond_tool.json
+8c304163d1c217c608e4081c8a1325b86bee85b9 data/minecraft/tags/blocks/needs_iron_tool.json

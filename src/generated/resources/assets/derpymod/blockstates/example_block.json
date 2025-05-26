@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "derpymod:block/example_block"
+    }
+  }
+}
