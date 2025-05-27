@@ -6,11 +6,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
-public abstract class LeveledIUpgrade implements IUpgrade {
+public abstract class LeveledUpgrade implements IUpgrade {
     private final String id;
     private final int maxLevel;
     private int level = 0;
-    protected LeveledIUpgrade(String id, int maxLevel) {
+    protected LeveledUpgrade(String id, int maxLevel) {
         this.id = id;
         this.maxLevel = maxLevel;
     }
@@ -42,6 +42,11 @@ public abstract class LeveledIUpgrade implements IUpgrade {
     @Override
     public void reset() {
         level = 0;
+    }
+
+    @Override
+    public int getLevel() {
+        return level;
     }
 
 

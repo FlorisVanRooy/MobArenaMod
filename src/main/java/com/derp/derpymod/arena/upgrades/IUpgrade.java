@@ -11,4 +11,5 @@ public interface IUpgrade {
     void load(CompoundTag tag);
     default boolean isPermanent() { return false; }
     default void reset() { }
+    default int getLevel() { return 0;}
 }

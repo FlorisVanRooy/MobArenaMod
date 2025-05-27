@@ -225,31 +225,32 @@ public class DerpyMod {
 
     @SubscribeEvent
     public void onLivingHurt(LivingHurtEvent event) {
-//        if (!event.getEntity().level().isClientSide) {
-//            if (event.getEntity() instanceof Player player && !player.isOnFire()) {
-//                // On player hurt
-//                if (Wave.getInstance().getWaveMutation() == 2) {
-//                    player.setRemainingFireTicks(60);
-//                    player.hurtMarked = true;
-//                }
-//            } else {
-//                // Early exit if the damage source is not an arrow
-//                if (!(event.getSource().getDirectEntity() instanceof AbstractArrow arrow)) {
-//                    return;
-//                }
-//
-//                // Check if the shooter is a player
-//                if (arrow.getOwner() instanceof Player player) {
-//                    System.out.println("Detected");
-//                    player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-//                        var multiplier = upgradeData.getUpgrade("bowDamageUpgradeInfinite").getLevel() + 1;
-//                        float newDamage = (event.getAmount() + multiplier - 1);
-//                        System.out.println("Modified arrow damage to " + newDamage + " because of multiplier: " + multiplier + " and normal damage : " + event.getAmount());
-//                        event.setAmount(newDamage);
-//                    });
-//                }
-//            }
-//        }
+        if (!event.getEntity().level().isClientSide) {
+            if (event.getEntity() instanceof Player player && !player.isOnFire()) {
+                CustomWorldData worldData = CustomWorldData.get(player.level());
+                // On player hurt
+                if (worldData.getWaveMutation() == 2) {
+                    player.setRemainingFireTicks(60);
+                    player.hurtMarked = true;
+                }
+            } else {
+                // Early exit if the damage source is not an arrow
+                if (!(event.getSource().getDirectEntity() instanceof AbstractArrow arrow)) {
+                    return;
+                }
+
+                CompoundTag tag = arrow.getPersistentData();
+                if (!tag.contains("increaseDamageLevel")) return;
+
+                int level = tag.getInt("increaseDamageLevel");
+                if (level <= 0) return;
+
+                // e.g. +1 damage per level
+                float bonus = level;
+                float newDamage = event.getAmount() + bonus;
+                event.setAmount(newDamage);
+            }
+        }
     }
 
     @SubscribeEvent

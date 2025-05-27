@@ -3,10 +3,10 @@ package com.derp.derpymod.arena.upgrades;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 
-public abstract class OneTimeIUpgrade implements IUpgrade {
+public abstract class OneTimeUpgrade implements IUpgrade {
     private final String id;
     private boolean unlocked = false;
-    protected OneTimeIUpgrade(String id) { this.id = id; }
+    protected OneTimeUpgrade(String id) { this.id = id; }
 
     @Override public String getId() { return id; }
     @Override public boolean purchase(Player player) {
@@ -25,6 +25,11 @@ public abstract class OneTimeIUpgrade implements IUpgrade {
     @Override
     public void reset() {
         unlocked = false;
+    }
+
+    @Override
+    public int getLevel() {
+        return unlocked ? 1 : 0;
     }
 
 }
