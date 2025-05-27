@@ -1,4 +1,4 @@
-package com.derp.derpymod.packets;
+package com.derp.derpymod.screen;
 
 public enum ScreenType {
     UPGRADE_TABLE,

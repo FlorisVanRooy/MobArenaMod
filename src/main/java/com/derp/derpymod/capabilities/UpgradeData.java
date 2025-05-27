@@ -1,14 +1,10 @@
 package com.derp.derpymod.capabilities;
 
-import com.derp.derpymod.arena.normalupgrades.*;
-import com.derp.derpymod.arena.Upgrade;
-import com.derp.derpymod.arena.onetimebuyableupgrades.FlingingUpgrade;
-import com.derp.derpymod.arena.onetimebuyableupgrades.MinigunUnlock;
-import com.derp.derpymod.arena.permanentskilltree.ArmourUpgrade1;
-import com.derp.derpymod.arena.permanentskilltree.MaxHealthUpgrade1;
-import com.derp.derpymod.arena.permanentskilltree.MeleeDamageUpgrade1;
+import com.derp.derpymod.arena.upgrades.IUpgrade;
+import com.derp.derpymod.arena.upgrades.UpgradeRegistry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraftforge.common.capabilities.AutoRegisterCapability;
 
 import java.util.Collection;
@@ -17,70 +13,61 @@ import java.util.Map;
 
 @AutoRegisterCapability
 public class UpgradeData {
+    // Map of all loaded upgrades for this player
+    private final Map<String, IUpgrade> upgrades = new HashMap<>();
 
-    public UpgradeData() {
-
+    public IUpgrade getUpgrade(String id) {
+        return upgrades.get(id);
     }
-
-    private Map<String, Upgrade> upgrades = new HashMap<>();
-
-    public Upgrade getUpgrade(String key) {
-        return upgrades.get(key);
-    }
-
-    public Collection<Upgrade> getUpgrades() {
+    public Collection<IUpgrade> getUpgrades() {
         return upgrades.values();
     }
-
-    public void addUpgrade(String key, Upgrade upgrade) {
-        upgrades.put(key, upgrade);
+    public void addUpgrade(IUpgrade u) {
+        upgrades.put(u.getId(), u);
     }
 
+    // --- SERIALIZATION ---
     public void saveNBTData(CompoundTag nbt) {
-        ListTag upgradeList = new ListTag();
-        for (Map.Entry<String, Upgrade> entry : upgrades.entrySet()) {
-            CompoundTag upgradeTag = new CompoundTag();
-            upgradeTag.putString("Key", entry.getKey());
-            CompoundTag upgradeData = new CompoundTag();
-            entry.getValue().save(upgradeData);  // Ensure Upgrade class has save method
-            upgradeTag.put("Data", upgradeData);
-            upgradeList.add(upgradeTag);
+        ListTag list = new ListTag();
+        for (IUpgrade u : upgrades.values()) {
+            CompoundTag tag = new CompoundTag();
+            tag.putString("id", u.getId());
+            u.save(tag);
+            list.add(tag);
         }
-        nbt.put("Upgrades", upgradeList);
+        nbt.put("Upgrades", list);
     }
 
     public void loadNBTData(CompoundTag nbt) {
-        ListTag upgradeList = nbt.getList("Upgrades", CompoundTag.TAG_COMPOUND);
-        for (int i = 0; i < upgradeList.size(); i++) {
-            CompoundTag upgradeTag = upgradeList.getCompound(i);
-            String key = upgradeTag.getString("Key");
-            CompoundTag upgradeData = upgradeTag.getCompound("Data");
-            Upgrade upgrade = createUpgradeFromKey(key);
-            if (upgrade != null) {
-                upgrade.load(upgradeData);  // Ensure Upgrade class has load method
-                upgrades.put(key, upgrade);
+        ListTag list = nbt.getList("Upgrades", Tag.TAG_COMPOUND);
+        upgrades.clear();
+        for (Tag raw : list) {
+            CompoundTag tag = (CompoundTag) raw;
+            String id = tag.getString("id");
+            IUpgrade u = UpgradeRegistry.create(id);
+            if (u != null) {
+                u.load(tag);
+                upgrades.put(id, u);
+            } else {
+                // optionally log a warning: unknown id
             }
         }
     }
 
-    public void copyFrom(UpgradeData source) {
-        this.upgrades = new HashMap<>(source.upgrades);
-        System.out.println("UpgradeData copied: " + this.upgrades);
-    }
-
-    private Upgrade createUpgradeFromKey(String key) {
-        return switch (key) {
-            case "swordDamageUpgradeInfinite" -> new SwordDamageUpgradeInfinite();
-            case "bowDamageUpgradeInfinite" -> new BowDamageUpgradeInfinite();
-            case "armourUpgradeInfinite" -> new ArmourUpgradeInfinite();
-            case "movementSpeedUpgradeInfinite" -> new MovementSpeedUpgradeInfinite();
-            case "maxHealthUpgradeInfinite" -> new MaxHealthUpgradeInfinite();
-            case "maxHealthUpgrade1" -> new MaxHealthUpgrade1();
-            case "armourUpgrade1" -> new ArmourUpgrade1();
-            case "meleeDamageUpgrade1" -> new MeleeDamageUpgrade1();
-            case "flingingUpgrade" -> new FlingingUpgrade();
-            case "minigunUnlock" -> new MinigunUnlock();
-            default -> null;
-        };
+    // Copy (e.g. for player clone)
+    public void copyFrom(UpgradeData src) {
+        this.upgrades.clear();
+        // create fresh instances to avoid shared state:
+        for (IUpgrade u0 : src.upgrades.values()) {
+            IUpgrade u = UpgradeRegistry.create(u0.getId());
+            if (u != null) {
+                // copy their data via NBT
+                CompoundTag tmp = new CompoundTag();
+                u0.save(tmp);
+                u.load(tmp);
+                this.upgrades.put(u.getId(), u);
+            }
+        }
     }
 }
+

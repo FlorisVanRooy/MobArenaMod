@@ -3,7 +3,7 @@ package com.derp.derpymod.screen;
 import com.derp.derpymod.capabilities.CurrencyDataProvider;
 import com.derp.derpymod.capabilities.UpgradeDataProvider;
 import com.derp.derpymod.network.PacketHandler;
-import com.derp.derpymod.packets.SExecuteUpgradePacket;
+import com.derp.derpymod.packets.CBuyUpgradePacket;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -48,19 +48,19 @@ public class UpgradeTableScreen extends Screen {
             for (int i = 0; i < upgradeKeys.length; i++) {
                 String upgradeKey = upgradeKeys[i];
                 int finalI = i;
-                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                    var upgrade = upgradeData.getUpgrade(upgradeKey);
-                    if (upgrade != null) {
-                        Component tooltip = Component.literal(upgrade.getName() + "\nCost: " + upgrade.calculateEffectiveCost());
-                        Button button = Button.builder(Component.empty(), button1 -> onButtonClicked(upgradeKey))
-                                .pos(x + upgrade.getX(), y + upgrade.getY())
-                                .size(20, 20)
-                                .tooltip(Tooltip.create(tooltip))
-                                .build();
-                        button.setAlpha(0);
-                        addRenderableWidget(button);
-                    }
-                });
+//                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
+//                    var upgrade = upgradeData.getUpgrade(upgradeKey);
+//                    if (upgrade != null) {
+//                        Component tooltip = Component.literal(upgrade.getName() + "\nCost: " + upgrade.calculateEffectiveCost());
+//                        Button button = Button.builder(Component.empty(), button1 -> onButtonClicked(upgradeKey))
+//                                .pos(x + upgrade.getX(), y + upgrade.getY())
+//                                .size(20, 20)
+//                                .tooltip(Tooltip.create(tooltip))
+//                                .build();
+//                        button.setAlpha(0);
+//                        addRenderableWidget(button);
+//                    }
+//                });
             }
         } else {
             throw new IllegalStateException("Player not found.");
@@ -68,7 +68,7 @@ public class UpgradeTableScreen extends Screen {
     }
 
     private void onButtonClicked(String upgradeKey) {
-        SExecuteUpgradePacket packet = new SExecuteUpgradePacket(upgradeKey);
+        CBuyUpgradePacket packet = new CBuyUpgradePacket(upgradeKey);
         PacketHandler.sendToServer(packet);
     }
 

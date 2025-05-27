@@ -5,18 +5,16 @@ import com.derp.derpymod.arena.permanentskilltree.SkillTreeType;
 import com.derp.derpymod.capabilities.CurrencyDataProvider;
 import com.derp.derpymod.capabilities.UpgradeDataProvider;
 import com.derp.derpymod.network.PacketHandler;
-import com.derp.derpymod.packets.SExecuteUpgradePacket;
+import com.derp.derpymod.packets.CBuyUpgradePacket;
 import com.derp.derpymod.util.TabButton;
 import com.derp.derpymod.util.UpgradeButton;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
-import org.jline.reader.Widget;
 
 import java.util.*;
 
@@ -87,11 +85,11 @@ public class PermanentSkillTreeScreen extends Screen {
         }
 
         player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-            for (var upgrade : upgradeData.getUpgrades()) {
-                if (upgrade.isPermanent() && upgrade.getType() == type) {
-                    upgradeButtons.put(upgrade.getId(), new UpgradeButton(upgrade.getX(), upgrade.getY(), 20, 20, upgrade.getName(), upgrade.calculateEffectiveCost()));
-                }
-            }
+//            for (var upgrade : upgradeData.getUpgrades()) {
+//                if (upgrade.isPermanent() && upgrade.getType() == type) {
+//                    upgradeButtons.put(upgrade.getId(), new UpgradeButton(upgrade.getX(), upgrade.getY(), 20, 20, upgrade.getName(), upgrade.calculateEffectiveCost()));
+//                }
+//            }
         });
     }
 
@@ -236,7 +234,7 @@ public class PermanentSkillTreeScreen extends Screen {
     }
 
     private void handleUpgradeClick(String upgradeId) {
-        PacketHandler.sendToServer(new SExecuteUpgradePacket(upgradeId));
+        PacketHandler.sendToServer(new CBuyUpgradePacket(upgradeId));
     }
 
     public void refresh() {

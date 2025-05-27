@@ -2,35 +2,29 @@ package com.derp.derpymod;
 
 import com.derp.derpymod.arena.LossHandler;
 import com.derp.derpymod.arena.Wave;
-import com.derp.derpymod.arena.mutations.WaveMutation;
-import com.derp.derpymod.arena.normalupgrades.*;
-import com.derp.derpymod.arena.Upgrade;
-import com.derp.derpymod.arena.onetimebuyableupgrades.FlingingUpgrade;
-import com.derp.derpymod.arena.onetimebuyableupgrades.MinigunUnlock;
-import com.derp.derpymod.arena.permanentskilltree.ArmourUpgrade1;
-import com.derp.derpymod.arena.permanentskilltree.MaxHealthUpgrade1;
-import com.derp.derpymod.arena.permanentskilltree.MeleeDamageUpgrade1;
+import com.derp.derpymod.arena.mobs.CustomEnemy;
+import com.derp.derpymod.arena.upgrades.ModUpgrades;
+import com.derp.derpymod.arena.upgrades.IUpgrade;
+import com.derp.derpymod.arena.upgrades.UpgradeRegistry;
 import com.derp.derpymod.block.ModBlocks;
 import com.derp.derpymod.block.entity.ModBlockEntities;
 import com.derp.derpymod.capabilities.*;
 import com.derp.derpymod.client.models.StrongZombieModel;
 import com.derp.derpymod.client.renderer.StrongZombieRenderer;
+import com.derp.derpymod.dispatchers.RightClickDispatcher;
 import com.derp.derpymod.entities.StrongZombie;
 import com.derp.derpymod.init.EntityInit;
 import com.derp.derpymod.item.ModCreativeModeTabs;
 import com.derp.derpymod.item.ModItems;
-import com.derp.derpymod.packets.CSyncUpgradePacket;
+import com.derp.derpymod.packets.SSyncDataPacket;
 import com.derp.derpymod.network.PacketHandler;
-import com.derp.derpymod.packets.CurrencySyncPacket;
-import com.derp.derpymod.packets.ScreenType;
+import com.derp.derpymod.screen.ScreenType;
 import com.derp.derpymod.savedata.CustomWorldData;
 import com.derp.derpymod.screen.ModMenuTypes;
-import com.derp.derpymod.screen.PermanentSkillTreeScreen;
 import com.derp.derpymod.util.AttributeModifierUtils;
 import com.derp.derpymod.util.SwordDamageUtils;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -55,8 +49,6 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -83,11 +75,10 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.derp.derpymod.arena.permanentskilltree.MaxHealthUpgrade1.MAX_HEALTH_MODIFIER1_UUID;
+//import static com.derp.derpymod.arena.permanentskilltree.MaxHealthUpgrade1.MAX_HEALTH_MODIFIER1_UUID;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(DerpyMod.MODID)
@@ -110,13 +101,14 @@ public class DerpyMod {
         // Register the Deferred Register to the mod event bus so tabs get registered
         ModCreativeModeTabs.register(modEventBus);
         EntityInit.ENTITIES.register(modEventBus);
-//        ModDamageTypes.register(modEventBus);
+        MinecraftForge.EVENT_BUS.register(this);
+
 
         ModMenuTypes.register(modEventBus);
         ModBlockEntities.register(modEventBus);
 
-        // Register ourselves for server and other game events we are interested in
-        MinecraftForge.EVENT_BUS.register(this);
+        // register the mod upgrades
+        ModUpgrades.init();
 
         // Register the item to a creative tab
 //        modEventBus.addListener(this::addCreative);
@@ -128,7 +120,7 @@ public class DerpyMod {
     private void commonSetup(final FMLCommonSetupEvent event) {
         // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
-//        NetworkHandler.register();
+        event.enqueueWork(RightClickDispatcher::init);
         PacketHandler.register();
 
         if (Config.logDirtBlock)
@@ -162,16 +154,16 @@ public class DerpyMod {
             CustomWorldData data = CustomWorldData.get(world);
             Map<BlockPos, BlockState> originalBlockStates = data.getOriginalBlockStates();
             if (blockState.is(Blocks.BEDROCK)) {
-                if (originalBlockStates.containsKey(pos)) {
-                    world.setBlock(pos, originalBlockStates.get(pos), 3);
-                    originalBlockStates.remove(pos);
+                if (data.getOriginalBlockStates().containsKey(pos)) {
+                    world.setBlock(pos, data.getOriginalBlockStates().get(pos), 3);
+                    data.removeOriginalBlockState(pos);
                 }
             } else {
-                originalBlockStates.put(pos, blockState);
+                data.putOriginalBlockState(pos, blockState);
                 world.setBlock(pos, Blocks.BEDROCK.defaultBlockState(), 3);
             }
-            data.setOriginalBlockStates(originalBlockStates);
-            Wave.getInstance().changeSpawnPositions(pos, player);
+
+            data.toggleSpawnPosition(pos);
             data.setDirty();
 
             // Set interaction result to SUCCESS and cancel event
@@ -180,233 +172,39 @@ public class DerpyMod {
             return; // Exit early after handling the custom logic
         }
 
-        // Handle Upgrade Table and Permanent Skill Tree logic
-        if (blockState.getBlock() == ModBlocks.UPGRADE_TABLE.get() || blockState.getBlock() == ModBlocks.PERMANENT_SKILL_TREE.get()) {
-            if (player instanceof ServerPlayer serverPlayer) {
-                serverPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                    CompoundTag upgradeDataTag = new CompoundTag();
-                    upgradeData.saveNBTData(upgradeDataTag);
+        if (blockState.getBlock() == ModBlocks.UPGRADE_TABLE.get() ||
+                blockState.getBlock() == ModBlocks.PERMANENT_SKILL_TREE.get()) {
 
-                    ScreenType screenType = (blockState.getBlock() == ModBlocks.UPGRADE_TABLE.get())
-                            ? ScreenType.UPGRADE_TABLE
-                            : ScreenType.PERMANENT_SKILL_TREE;
+            if (!(player instanceof ServerPlayer serverPlayer)) return;
 
-                    CSyncUpgradePacket packet = new CSyncUpgradePacket(upgradeDataTag, screenType);
-                    PacketHandler.sendToPlayer(packet, serverPlayer);
-                });
-            }
+            // 1) Prepare upgrade data NBT
+            CompoundTag upgradesNBT = new CompoundTag();
+            serverPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA)
+                    .ifPresent(upData -> upData.saveNBTData(upgradesNBT));
 
-            // Handle Currency Sync logic
-            if (player instanceof ServerPlayer serverPlayer) {
-                serverPlayer.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(currencyData -> {
-                    CompoundTag currencyDataTag = new CompoundTag();
-                    currencyData.saveNBTData(currencyDataTag);
+            // 2) Prepare currency data NBT
+            CompoundTag currencyNBT = new CompoundTag();
+            serverPlayer.getCapability(CurrencyDataProvider.CURRENCY_DATA)
+                    .ifPresent(cd -> cd.saveNBTData(currencyNBT));
 
-                    CurrencySyncPacket packet = new CurrencySyncPacket(currencyDataTag);
-                    PacketHandler.sendToPlayer(packet, serverPlayer);
-                });
-            }
+            // 3) Determine which screen to open
+            ScreenType screenType = (blockState.getBlock() == ModBlocks.UPGRADE_TABLE.get())
+                    ? ScreenType.UPGRADE_TABLE
+                    : ScreenType.PERMANENT_SKILL_TREE;
 
-            // Set interaction result to SUCCESS and cancel event
+            // 4) Send one packet with both data + the desired GUI
+            SSyncDataPacket packet = new SSyncDataPacket(upgradesNBT, currencyNBT, screenType);
+            PacketHandler.sendToPlayer(packet, serverPlayer);
+
+            // 5) Finish the interaction
             event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
             event.setCanceled(true);
-            return; // Exit early after handling the custom logic
         }
-
-        // Allow normal block placement and interaction
-        event.setCancellationResult(InteractionResult.PASS);
-        event.setCanceled(false);
     }
-
-    private static final long COOLDOWN_MILLIS = 100; // 0.1 seconds cooldown
-    private static long lastRightClickTime = 0;
 
     @SubscribeEvent
     public void onPlayerRightClickItem(PlayerInteractEvent.RightClickItem event) {
-        Player player = event.getEntity();
-        Level world = event.getLevel();
-        Item clickedItem = event.getItemStack().getItem();
-        if (!event.getLevel().isClientSide && !player.level().isClientSide) {
-            ServerLevel serverLevel = (ServerLevel) world;
-            // if item clicked is stick
-            if (clickedItem == Items.STICK && Wave.getInstance().areAllMobsDead(event.getLevel())) {
-                Wave wave = Wave.getInstance();
-                wave.startWave(serverLevel);
-            }
-
-            if (clickedItem == Items.GOLDEN_SHOVEL) {
-                Wave.getInstance().resetWaves(serverLevel);
-            }
-
-
-            // if clicked item is a minigun
-            else if (clickedItem == ModItems.MINIGUN_ITEM.get()) {
-                long currentTime = System.currentTimeMillis();
-
-                // Check cooldown
-                if (currentTime - lastRightClickTime < COOLDOWN_MILLIS) {
-                    LOGGER.info("Minigun right-click on cooldown...");
-                    return;
-                }
-                double distanceInFront = 1.5;
-                double motionMultiplier = 0.75;
-                double yaw = Math.toRadians(player.getYRot());
-                double pitch = Math.toRadians(player.getXRot());
-                // Calculate unit vectors for direction
-                double directionX = -Math.sin(yaw) * Math.cos(pitch);
-                double directionY = -Math.sin(pitch);
-                double directionZ = Math.cos(yaw) * Math.cos(pitch);
-                double spawnX = player.getX() + directionX * distanceInFront;
-                double spawnY = player.getY() + directionY * distanceInFront;
-                double spawnZ = player.getZ() + directionZ * distanceInFront;
-
-                Arrow arrow = new Arrow(world, player);
-                arrow.setDeltaMovement(directionX * motionMultiplier, directionY * motionMultiplier, directionZ * motionMultiplier);
-                arrow.setPos(spawnX, spawnY + 1.5, spawnZ);
-                arrow.setBaseDamage(1.5);
-                arrow.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
-
-                world.addFreshEntity(arrow);
-                lastRightClickTime = currentTime;
-            }
-
-            // if clicked item is an amethyst shard
-            else if (event.getItemStack().getItem() == Items.AMETHYST_SHARD) {
-                player.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(currencyData -> {
-                    currencyData.addCurrency(100);
-                    currencyData.addPermanentCurrency(100);
-                    player.sendSystemMessage(Component.literal("You have " + currencyData.getCurrency() + " monez right now!"));
-                    player.sendSystemMessage(Component.literal("You have " + currencyData.getPermanentCurrency() + " permanent monez right now!!"));
-                });
-            }
-
-            // if clicked item is a blaze rod
-            else if (event.getItemStack().getItem() == Items.BLAZE_ROD) {
-                System.out.println("MaxHealth1 upgrade launched in main file");
-                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                    String upgradeKey = "maxHealthUpgrade1";
-                    if (upgradeData.getUpgrade(upgradeKey) == null) {
-                        MaxHealthUpgrade1 maxHealthUpgrade1 = new MaxHealthUpgrade1();
-                        upgradeData.addUpgrade(upgradeKey, maxHealthUpgrade1);
-                    }
-                    upgradeData.getUpgrade(upgradeKey).executeUpgrade(player);
-                });
-            }
-            // if clicked item is a blaze rod
-            else if (event.getItemStack().getItem() == Items.CARROT_ON_A_STICK) {
-                System.out.println("Armour1 upgrade launched in main file");
-                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                    String upgradeKey = "armourUpgrade1";
-                    if (upgradeData.getUpgrade(upgradeKey) == null) {
-                        ArmourUpgrade1 armourUpgrade1 = new ArmourUpgrade1();
-                        upgradeData.addUpgrade(upgradeKey, armourUpgrade1);
-                    }
-                    upgradeData.getUpgrade(upgradeKey).executeUpgrade(player);
-                });
-            }
-
-
-            // if clicked item is a compass
-            else if (event.getItemStack().getItem() == Items.COMPASS) {
-                System.out.println("Minigun unlock launched in main file");
-                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                    upgradeData.getUpgrade("minigunUnlock").executeUpgrade(player);
-                });
-            }
-
-            // if clicked item is a wooden sword
-            else if (event.getItemStack().getItem() == Items.WOODEN_SWORD) {
-                player.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(currencyData -> {
-                    player.sendSystemMessage(Component.literal("You have " + currencyData.getCurrency() + " monez right now!"));
-                });
-            } else if (event.getItemStack().getItem() == Items.FERMENTED_SPIDER_EYE) {
-                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                    for (Upgrade upgrade : upgradeData.getUpgrades()) {
-                        upgrade.resetUpgrade(player);
-                    }
-                });
-                // reset sword damage
-                for (ItemStack stack : player.getInventory().items) {
-                    if (stack.getItem() == Items.WOODEN_SWORD) {
-                        SwordDamageUtils.resetDamage(stack);
-                    }
-                }
-
-            } else if (event.getItemStack().getItem() == Items.ARROW) {
-                // give starting sword
-                ItemStack sword = Items.WOODEN_SWORD.getDefaultInstance();
-
-                CompoundTag tag = sword.getOrCreateTag();
-                tag.putBoolean("Unbreakable", true);
-
-                SwordDamageUtils.addAttackDamageModifier(sword, 4);
-
-                // give attack damage
-//                CompoundTag modifierTag = new CompoundTag();
-//                modifierTag.putString("AttributeName", "generic.attack_damage");
-//                modifierTag.putDouble("Amount", 4);
-//                modifierTag.putInt("Operation", AttributeModifier.Operation.ADDITION.toValue());
-//                modifierTag.putUUID("UUID", UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
-//                modifierTag.putString("Name", "generic.attack_damage");
-//                modifierTag.putString("Slot", "mainhand");
-//
-//                ListTag modifiers = sword.getOrCreateTag().getList("AttributeModifiers", Tag.TAG_COMPOUND);
-//                modifiers.add(modifierTag);
-//                sword.getOrCreateTag().put("AttributeModifiers", modifiers); // Update the item stack's tag
-//                System.out.println("Added modifier: " + modifierTag);
-                player.getInventory().placeItemBackInInventory(sword);
-
-
-                // give starting bow
-                ItemStack bow = Items.BOW.getDefaultInstance();
-                tag = bow.getOrCreateTag();
-                tag.putBoolean("Unbreakable", true);
-                bow.enchant(Enchantments.INFINITY_ARROWS, 1);
-                player.getInventory().placeItemBackInInventory(bow);
-
-
-                // alternative armour
-                var armour = player.getAttribute(Attributes.ARMOR);
-                UUID armourModifierId = UUID.fromString("223e4567-e89b-12d3-a456-426614174000");
-                if (armour != null) {
-                    armour.removeModifier(armourModifierId);
-                    armour.addPermanentModifier(new AttributeModifier(armourModifierId, "Armour modifier", 5, AttributeModifier.Operation.ADDITION));
-                    player.getPersistentData().putDouble("baseArmour", 5);
-                    System.out.println("Changed player armour");
-                }
-
-//                // give starting armour
-//                ItemStack helmet = Items.CHAINMAIL_HELMET.getDefaultInstance();
-//
-//                tag = helmet.getOrCreateTag();
-//                tag.putBoolean("Unbreakable", true);
-//
-//                modifierTag = new CompoundTag();
-//                modifierTag.putString("AttributeName", "generic.armor");
-//                modifierTag.putDouble("Amount", 0);
-//                modifierTag.putInt("Operation", AttributeModifier.Operation.ADDITION.toValue());
-//                modifierTag.putUUID("UUID", UUID.fromString("INSERT UUID STRING"));
-//                modifierTag.putString("Name", "generic.armor");
-//                modifierTag.putString("Slot", "head");
-//
-//                modifiers = helmet.getOrCreateTag().getList("AttributeModifiers", Tag.TAG_COMPOUND);
-//                modifiers.add(modifierTag);
-//                helmet.getOrCreateTag().put("AttributeModifiers", modifiers); // Update the item stack's tag
-//                System.out.println("Added modifier: " + modifierTag);
-//                player.getInventory().placeItemBackInInventory(helmet);
-            }
-        }
-    }
-
-    //TODO om een aantal ronden een special wave met special effect maken: silverfish on jump.
-    @SubscribeEvent
-    public void onPlayerJump(LivingEvent.LivingJumpEvent event) {
-        if (event.getEntity() instanceof Player player && !player.level().isClientSide) {
-            if (Wave.getInstance().getWaveMutation() == 1) {
-                WaveMutation.getInstance().summonSilverfish(player);
-            }
-        }
-
+        RightClickDispatcher.dispatch(event);
     }
 
     @SubscribeEvent
@@ -427,31 +225,31 @@ public class DerpyMod {
 
     @SubscribeEvent
     public void onLivingHurt(LivingHurtEvent event) {
-        if (!event.getEntity().level().isClientSide) {
-            if (event.getEntity() instanceof Player player && !player.isOnFire()) {
-                // On player hurt
-                if (Wave.getInstance().getWaveMutation() == 2) {
-                    player.setRemainingFireTicks(60);
-                    player.hurtMarked = true;
-                }
-            } else {
-                // Early exit if the damage source is not an arrow
-                if (!(event.getSource().getDirectEntity() instanceof AbstractArrow arrow)) {
-                    return;
-                }
-
-                // Check if the shooter is a player
-                if (arrow.getOwner() instanceof Player player) {
-                    System.out.println("Detected");
-                    player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                        var multiplier = upgradeData.getUpgrade("bowDamageUpgradeInfinite").getLevel() + 1;
-                        float newDamage = (event.getAmount() + multiplier - 1);
-                        System.out.println("Modified arrow damage to " + newDamage + " because of multiplier: " + multiplier + " and normal damage : " + event.getAmount());
-                        event.setAmount(newDamage);
-                    });
-                }
-            }
-        }
+//        if (!event.getEntity().level().isClientSide) {
+//            if (event.getEntity() instanceof Player player && !player.isOnFire()) {
+//                // On player hurt
+//                if (Wave.getInstance().getWaveMutation() == 2) {
+//                    player.setRemainingFireTicks(60);
+//                    player.hurtMarked = true;
+//                }
+//            } else {
+//                // Early exit if the damage source is not an arrow
+//                if (!(event.getSource().getDirectEntity() instanceof AbstractArrow arrow)) {
+//                    return;
+//                }
+//
+//                // Check if the shooter is a player
+//                if (arrow.getOwner() instanceof Player player) {
+//                    System.out.println("Detected");
+//                    player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
+//                        var multiplier = upgradeData.getUpgrade("bowDamageUpgradeInfinite").getLevel() + 1;
+//                        float newDamage = (event.getAmount() + multiplier - 1);
+//                        System.out.println("Modified arrow damage to " + newDamage + " because of multiplier: " + multiplier + " and normal damage : " + event.getAmount());
+//                        event.setAmount(newDamage);
+//                    });
+//                }
+//            }
+//        }
     }
 
     @SubscribeEvent
@@ -465,18 +263,18 @@ public class DerpyMod {
 
     @SubscribeEvent
     public void onAttackWithSword(AttackEntityEvent event) {
-        Player player = event.getEntity();
-        if (!player.level().isClientSide && player.getMainHandItem().getItem() == Items.WOODEN_SWORD) {
-            player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                if (upgradeData.getUpgrade("flingingUpgradeInfinite").getLevel() == 1) {
-                    player.getCapability(PlayerDataProvider.PLAYER_DATA).ifPresent(playerData -> {
-                        player.addDeltaMovement(new Vec3(0, 2, 0));
-                        player.hurtMarked = true;
-                        playerData.setFlinging(true);
-                    });
-                }
-            });
-        }
+//        Player player = event.getEntity();
+//        if (!player.level().isClientSide && player.getMainHandItem().getItem() == Items.WOODEN_SWORD) {
+//            player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
+//                if (upgradeData.getUpgrade("flingingUpgradeInfinite").getLevel() == 1) {
+//                    player.getCapability(PlayerDataProvider.PLAYER_DATA).ifPresent(playerData -> {
+//                        player.addDeltaMovement(new Vec3(0, 2, 0));
+//                        player.hurtMarked = true;
+//                        playerData.setFlinging(true);
+//                    });
+//                }
+//            });
+//        }
     }
 
     @SubscribeEvent
@@ -528,7 +326,7 @@ public class DerpyMod {
         var maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
         if (maxHealth != null) {
 //            maxHealth.removeModifier(MAX_HEALTH_MODIFIER1_UUID);
-            maxHealth.addPermanentModifier(new AttributeModifier(MAX_HEALTH_MODIFIER1_UUID, "Max health modifier", amount, AttributeModifier.Operation.ADDITION));
+            //maxHealth.addPermanentModifier(new AttributeModifier(MAX_HEALTH_MODIFIER1_UUID, "Max health modifier", amount, AttributeModifier.Operation.ADDITION));
             player.setHealth(player.getHealth());
         }
     }
@@ -536,30 +334,23 @@ public class DerpyMod {
     @SubscribeEvent
     public void onLivingDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof Player)) {
-            if (!(event.getEntity() instanceof Silverfish)) {
-                // On mob death / kill
-                if (event.getSource().getEntity() instanceof Player) {
-                    Player player = (Player) event.getSource().getEntity();
-                    if (!player.level().isClientSide) {
-                        player.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(currencyData -> {
-                            LivingEntity entity = event.getEntity();
-                            Integer currency = Wave.getInstance().getEnemyCost(entity.getType());
-
-                            if (currency != null) {
-                                currencyData.addCurrency(currency);
-                                LOGGER.info("Added {} currency for killing {}", currency, entity.getType());
-                            }
-                        });
-                    }
-                }
                 // Handle wave system
                 LivingEntity entity = event.getEntity();
                 if (!entity.level().isClientSide) {
-                    if (!(entity instanceof Player)) {
-                        Wave.getInstance().removeMob(entity, entity.level());
+                    Wave wave = new Wave();
+                    if (wave.removeMob(entity, (ServerLevel) entity.level())) {
+                        if (event.getSource().getEntity() instanceof ServerPlayer player) {
+                            CustomEnemy.getMatchingEnemy(entity).ifPresent(enemy -> {
+                                int currency = enemy.cost();
+
+                                player.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(currencyData -> {
+                                    currencyData.addCurrency(currency);
+                                    LOGGER.info("Added {} currency for killing {}", currency, entity.getType());
+                                });
+                            });
+                        }
                     }
                 }
-            }
         } else {
             // On player death
             Player player = (Player) event.getEntity();
@@ -577,35 +368,40 @@ public class DerpyMod {
         if (!event.getLevel().isClientSide) {
             Entity entity = event.getExplosion().getExploder();
             if (entity instanceof Creeper creeper) {
-                Wave.getInstance().removeMob(creeper, entity.level());
+                Wave wave = new Wave();
+                wave.removeMob(creeper, (ServerLevel) entity.level());
             }
         }
     }
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!event.getEntity().level().isClientSide) {
-            event.getEntity().getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-                Map<String, Upgrade> upgrades = new HashMap<>();
-                upgrades.put("bowDamageUpgradeInfinite", new BowDamageUpgradeInfinite());
-                upgrades.put("swordDamageUpgradeInfinite", new SwordDamageUpgradeInfinite());
-                upgrades.put("armourUpgradeInfinite", new ArmourUpgradeInfinite());
-                upgrades.put("maxHealthUpgradeInfinite", new MaxHealthUpgradeInfinite());
-                upgrades.put("movementSpeedUpgradeInfinite", new MovementSpeedUpgradeInfinite());
-                upgrades.put("maxHealthUpgrade1", new MaxHealthUpgrade1());
-                upgrades.put("armourUpgrade1", new MaxHealthUpgrade1());
-                upgrades.put("meleeDamageUpgrade1", new MeleeDamageUpgrade1());
-                upgrades.put("flingingUpgradeInfinite", new FlingingUpgrade());
-                upgrades.put("minigunUnlockInfinite", new MinigunUnlock());
-
-                upgrades.forEach((key, upgrade) -> {
-                    if (upgradeData.getUpgrade(key) == null) {
-                        upgradeData.addUpgrade(key, upgrade);
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            // 1) Ensure the player has an instance of every registered upgrade
+            serverPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(data -> {
+                for (String id : UpgradeRegistry.ids()) {
+                    if (data.getUpgrade(id) == null) {
+                        data.addUpgrade(UpgradeRegistry.create(id));
                     }
-                });
+                }
+
+                // 2) Build the two NBT blobs
+                CompoundTag upNBT = new CompoundTag();
+                data.saveNBTData(upNBT);
+
+                CompoundTag currencyNBT = new CompoundTag();
+                serverPlayer.getCapability(CurrencyDataProvider.CURRENCY_DATA)
+                        .ifPresent(cd -> cd.saveNBTData(currencyNBT));
+
+                // 3) Send one sync packet (no GUI open—screenType = null)
+                PacketHandler.sendToPlayer(
+                        new SSyncDataPacket(upNBT, currencyNBT, null),
+                        serverPlayer
+                );
             });
         }
     }
+
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)

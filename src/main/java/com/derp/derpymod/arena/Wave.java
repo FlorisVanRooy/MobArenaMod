@@ -1,263 +1,175 @@
+// src/main/java/com/derp/derpymod/arena/Wave.java
 package com.derp.derpymod.arena;
 
-import com.derp.derpymod.DerpyMod;
+import com.derp.derpymod.arena.mobs.CustomEnemy;
 import com.derp.derpymod.init.EntityInit;
 import com.derp.derpymod.savedata.CustomWorldData;
-import com.google.common.reflect.TypeToken;
-import com.google.gson.Gson;
-import com.google.gson.internal.reflect.ReflectionHelper;
-import it.unimi.dsi.fastutil.Hash;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.monster.Zombie;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 
-import java.awt.*;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.file.Paths;
 import java.util.*;
-import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.derp.derpymod.arena.mobs.CustomEnemy.ENEMIES;
 
 public class Wave {
-    private static Wave wave;
-    private final Map<EntityType<?>, Integer> CURRENCY_VALUES = new HashMap<>();
-    private int waveMutation = 0;
-    private int mutationChance = 1;
 
-    private Wave() {
-        initializeCurrencyValues();
-    }
-
-    public static Wave getInstance() {
-        if (wave == null) {
-            wave = new Wave();
-        }
-        return wave;
-    }
-
-    private void initializeCurrencyValues() {
-        CURRENCY_VALUES.put(EntityType.SILVERFISH, 0);
-        CURRENCY_VALUES.put(EntityType.ZOMBIE, 2);
-        CURRENCY_VALUES.put(EntityType.CREEPER, 3);
-        CURRENCY_VALUES.put(EntityType.SKELETON, 5);
-        CURRENCY_VALUES.put(EntityType.SPIDER, 4);
-        CURRENCY_VALUES.put(EntityInit.STRONG_ZOMBIE.get(), 10);
-    }
-
-    private int getWaveCurrency(int waveNumber) {
-        int currency = 100;
-        for (int i = 1; i <= waveNumber; i++) {
-            if (i < 5) {
-                currency += 20;
-            } else if (i < 10) {
-                currency += 50;
-            } else if (i < 20) {
-                currency += 68;
-            } else if (i < 25) {
-                currency += 100;
-            } else {
-                currency += 200;
-            }
-        }
-        return currency;
-    }
-
-    private List<EntityType<?>> getAvailableEnemies(int waveNumber) {
-        List<EntityType<?>> availableEnemies = new ArrayList<>();
-        availableEnemies.add(EntityType.ZOMBIE);
-        availableEnemies.add(EntityType.CREEPER);
-        availableEnemies.add(EntityType.SPIDER);
-        availableEnemies.add(EntityType.SKELETON);
-        if (waveNumber > 5) {
-            availableEnemies.add(EntityInit.STRONG_ZOMBIE.get());
-            if (waveNumber > 10) {
-                availableEnemies.add(EntityType.WITHER_SKELETON);
-                availableEnemies.add(EntityType.STRAY);
-                if (waveNumber > 20) {
-                    availableEnemies.add(EntityType.VINDICATOR);
+    private static final List<IWaveMutation> MUTATIONS = List.of(
+            new IWaveMutation() { // vibration
+                public int weight() { return 1; }
+                public void apply(ServerLevel lvl) { /* no world effect */ }
+                public Component message() {
+                    return Component.literal("You feel vibrations from deep below")
+                            .withStyle(ChatFormatting.GREEN);
+                }
+            },
+            new IWaveMutation() {
+                public int weight() { return 1; }
+                public void apply(ServerLevel lvl) { /* no world effect */ }
+                public Component message() {
+                    return Component.literal("The air is getting warmer around you")
+                            .withStyle(ChatFormatting.GOLD);
+                }
+            },
+            new IWaveMutation() { // teleport prank
+                public int weight() { return 1; }
+                public void apply(ServerLevel lvl) {
+                    // teleport all players randomly within 16 blocks
+                    lvl.players().forEach(p -> {
+                        double dx = (lvl.getRandom().nextDouble()*32) - 16;
+                        double dz = (lvl.getRandom().nextDouble()*32) - 16;
+                        p.teleportTo(p.getX()+dx, p.getY(), p.getZ()+dz);
+                    });
+                }
+                public Component message() {
+                    return Component.literal("You have been teleported to Australia")
+                            .withStyle(ChatFormatting.RED);
                 }
             }
-        }
-        return availableEnemies;
-    }
+    );
 
-    public void changeSpawnPositions(BlockPos pos, Player player) {
-        Vec3 spawn = Vec3.atCenterOf(pos).add(new Vec3(0, 1, 0));
-        ServerLevel level = (ServerLevel) player.level();
-        CustomWorldData data = CustomWorldData.get(level);
+    private static final Random RNG = new Random();
 
-        if (data.getSpawnPositions().contains(spawn)) {
-            data.getSpawnPositions().remove(spawn);
-            player.sendSystemMessage(Component.literal("Spawn removed!"));
-        } else {
-            data.getSpawnPositions().add(spawn);
-            player.sendSystemMessage(Component.literal("Spawn added!"));
-        }
-        data.setDirty();
-    }
-
+    /** Start the next wave on this level */
     public void startWave(ServerLevel level) {
         CustomWorldData data = CustomWorldData.get(level);
-        List<Vec3> spawnPositions = data.getSpawnPositions();
-        var players = level.players();
-        if (!spawnPositions.isEmpty()) {
-            int waveNumber = data.getWaveNumber();
-            int waveCurrency = getWaveCurrency(waveNumber);
-            List<EntityType<?>> availableEnemies = getAvailableEnemies(waveNumber);
-            Random random = new Random();
-            int waveMutationRandom = random.nextInt(100);
-            if (waveMutationRandom == 99) {
-                level.players().forEach(player -> {
-                    player.sendSystemMessage(Component.literal("You feel an evil presence watching you..."));
-                });
-            }
-            if (waveMutationRandom < mutationChance) {
-                int mutationNumber = random.nextInt(1,3);
-                activateWaveMutation(mutationNumber, level);
-                mutationChance = 1;
-            }
-
-            while (waveCurrency > 0) {
-                EntityType<?> enemyType = availableEnemies.get(random.nextInt(availableEnemies.size()));
-                int enemyCost = getEnemyCost(enemyType);
-                Vec3 spawnPos = spawnPositions.get(random.nextInt(spawnPositions.size()));
-                LivingEntity enemy = (LivingEntity) enemyType.create(level);
-                if (enemy != null) {
-                    enemy.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
-                    level.addFreshEntity(enemy);
-                    data.addSpawnedMob(enemy);
-                    waveCurrency -= enemyCost;
-                }
-            }
-
-            if (waveMutation == 3) {
-                var entities = level.getAllEntities();
-                for (var entity : entities) {
-                    if (entity instanceof Mob) {
-                        entity.setCustomName(Component.literal("Dinnerbone"));
-                    }
-                }
-            }
-            data.setWaveNumber(waveNumber + 1);
-            players.forEach(player -> {
-                player.sendSystemMessage(Component.literal("Wave " + waveNumber + " started!").withStyle(ChatFormatting.GOLD));
-            });
-        } else {
-            players.forEach(player -> {
-                player.sendSystemMessage(Component.literal("No spawn positions set!").withStyle(ChatFormatting.GOLD));
-            });
+        List<BlockPos> spawns = new ArrayList<>(data.getSpawnPositions());
+        if (spawns.isEmpty()) {
+            level.players().forEach(p ->
+                    p.sendSystemMessage(Component.literal("No spawn positions set!").withStyle(ChatFormatting.RED))
+            );
+            return;
         }
-    }
 
-    public int getWaveMutation() {
-        return waveMutation;
-    }
+        int waveNum = data.getWaveNumber();
+        int budget  = getWaveCurrency(waveNum);
+        List<CustomEnemy> pool = ENEMIES.stream()
+                .filter(e -> waveNum >= e.minWave())
+                .toList();
 
-    public void setWaveMutation(int waveMutation) {
-        this.waveMutation = waveMutation;
-    }
-
-    private void activateWaveMutation(int mutationNumber, ServerLevel level) {
-        Component message;
-        if (mutationNumber == 1) {
-            message = Component.literal("You feel vibrations from deep below").withStyle(ChatFormatting.GREEN);
+        // maybe mutate
+        if (RNG.nextInt(100) < data.getMutationChance()) {
+            IWaveMutation mut = pickWeighted(MUTATIONS);
+            mut.apply(level);
+            data.setWaveMutation(MUTATIONS.indexOf(mut)+1);
+            level.players().forEach(p -> p.sendSystemMessage(mut.message()));
+            data.setMutationChance(1);
         }
-        else if (mutationNumber == 2) {
-            message = Component.literal("The air is getting warmer around you").withStyle(ChatFormatting.GOLD);
+
+        // spawn until out of budget
+        while (budget > 0 && !pool.isEmpty()) {
+            CustomEnemy entry = pool.get(RNG.nextInt(pool.size()));
+            if (entry.cost() > budget) break;
+
+            BlockPos pos = spawns.get(RNG.nextInt(spawns.size()));
+            Vec3 loc = new Vec3(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+
+            LivingEntity mob = (LivingEntity) entry.baseType().create(level);
+            if (mob != null) {
+                mob.getPersistentData().putString("EnemyId", entry.id());
+                entry.customizer().accept(mob);
+                mob.teleportTo(loc.x, loc.y+1, loc.z);
+                level.addFreshEntity(mob);
+                data.addAliveMob(mob.getUUID());
+                budget -= entry.cost();
+            }
         }
-        else if (mutationNumber == 3) {
-            message = Component.literal("You have been teleported to Australia").withStyle(ChatFormatting.GOLD);
-        } else {
-            message = Component.empty();
-        }
-        level.players().forEach(player -> {
-            player.sendSystemMessage(message);
-        });
-        waveMutation = mutationNumber;
+
+
+        // notify & advance
+        level.players().forEach(p ->
+                p.sendSystemMessage(Component.literal("Wave " + waveNum + " started!")
+                        .withStyle(ChatFormatting.GOLD))
+        );
+        data.setWaveNumber(waveNum + 1);
     }
 
-    private void removeMutation() {
-        waveMutation = 0;
-    }
-
-    public int getEnemyCost(EntityType<?> enemyType) {
-        return CURRENCY_VALUES.getOrDefault(enemyType, 10); // Default cost of 10 if not found
-    }
-
-    public void removeMob(LivingEntity entity, Level level) {
+    /** Call this when a mob dies or is removed */
+    public boolean removeMob(LivingEntity mob, ServerLevel level) {
         CustomWorldData data = CustomWorldData.get(level);
-        data.removeSpawnedMob(entity);
-        int mobCount = data.getSpawnedMobs().size();
-        if (mobCount == 10 || mobCount == 5 || mobCount < 4) {
-            Player player = Minecraft.getInstance().player;
-            if (!data.getSpawnedMobs().isEmpty()) {
-                if (player != null) {
-                    if (mobCount == 1) {
-                        player.sendSystemMessage(Component.literal("Only " + mobCount + " mob left"));
-                    } else {
-                        player.sendSystemMessage(Component.literal("Only " + mobCount + " mobs left"));
-                    }
-                }
-            } else {
-                endWave(level);
-            }
+        if (!data.getAliveMobs().contains(mob.getUUID())) {
+            return false;
         }
-    }
-
-    private void endWave(Level level) {
-        CustomWorldData data = CustomWorldData.get(level);
-        Player player = Minecraft.getInstance().player;
-        removeMutation();
-        player.sendSystemMessage(Component.literal("You beat wave " + (data.getWaveNumber() - 1))
-                .withStyle(ChatFormatting.BOLD)
-                .withStyle(ChatFormatting.RED));
-        if (!level.isClientSide) {
-            ServerLevel serverLevel = (ServerLevel) level;
-            revivePlayers(serverLevel);
+        data.removeAliveMob(mob.getUUID());
+        int remaining = data.getAliveMobs().size();
+        if (remaining > 0 && List.of(10, 5, 1).contains(remaining)) {
+            level.players().forEach(p ->
+                    p.sendSystemMessage(Component.literal("Only " + remaining + " mobs left"))
+            );
         }
-        mutationChance += 10;
+        if (remaining == 0) {
+            endWave(level);
+        }
+        return true;
     }
 
-    public void revivePlayers(ServerLevel level) {
-        level.getPlayers(serverPlayer -> true).forEach(serverPlayer -> {
-            if (serverPlayer.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
-                // Teleport player to their spawn point or world spawn
-                BlockPos spawnPos = serverPlayer.getRespawnPosition() != null ? serverPlayer.getRespawnPosition() : level.getSharedSpawnPos();
-                serverPlayer.teleportTo(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
-                serverPlayer.setGameMode(GameType.ADVENTURE);
-            }
-        });
-    }
-
-
-    public boolean areAllMobsDead(Level level) {
+    private void endWave(ServerLevel level) {
         CustomWorldData data = CustomWorldData.get(level);
-        return data.getSpawnedMobs().isEmpty();
+        data.setWaveMutation(0);
+        level.players().forEach(p ->
+                p.sendSystemMessage(
+                        Component.literal("You beat wave " + (data.getWaveNumber()-1))
+                                .withStyle(ChatFormatting.BOLD, ChatFormatting.GREEN))
+        );
+        data.setMutationChance(data.getMutationChance() + 10);
     }
 
-    public void resetWaves(ServerLevel serverLevel) {
-        CustomWorldData data = CustomWorldData.get(serverLevel);
-        data.resetWaves();
+    public boolean areAllMobsDead(ServerLevel level) {
+        return CustomWorldData.get(level).isAllMobsDead();
+    }
+
+    public void resetWaves(ServerLevel level) {
+        CustomWorldData.get(level).resetWaves();
+    }
+
+    /** O(1) wave currency: base 100 + tiered increments */
+    private static int getWaveCurrency(int wave) {
+        if (wave < 5)  return 100 + 20*wave;
+        if (wave < 10) return 100 + 20*4 + 50*(wave-4);
+        if (wave < 20) return 100 + 20*4 + 50*5 + 68*(wave-9);
+        if (wave < 25) return 100 + 20*4 + 50*5 + 68*10 + 100*(wave-19);
+        return 100 + 20*4 + 50*5 + 68*10 + 100*5 + 200*(wave-24);
+    }
+
+    /** Helper: pick one mutation by weight */
+    private static <T extends IWaveMutation> T pickWeighted(List<T> list) {
+        int total = list.stream().mapToInt(IWaveMutation::weight).sum();
+        int r = RNG.nextInt(total);
+        for (T m : list) {
+            r -= m.weight();
+            if (r < 0) return m;
+        }
+        return list.get(0); // fallback
     }
 }
