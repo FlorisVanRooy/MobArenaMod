@@ -1,5 +1,6 @@
 package com.derp.derpymod.screen;
 
+import com.derp.derpymod.arena.upgrades.leveledupgrades.*;
 import com.derp.derpymod.capabilities.CurrencyDataProvider;
 import com.derp.derpymod.capabilities.UpgradeDataProvider;
 import com.derp.derpymod.network.PacketHandler;
@@ -15,6 +16,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 
 public class UpgradeTableScreen extends Screen {
+    private record Slot(String upgradeId, int x, int y) {}
+
+    private static final Slot[] SLOTS = new Slot[]{
+            new Slot(BowDamageUpgradeInfinite.ID,    18,  19),
+            new Slot(SwordDamageUpgradeInfinite.ID,  58,  19),
+            new Slot(ArmourUpgradeInfinite.ID,       98,  19),
+            new Slot(MaxHealthUpgradeInfinite.ID,   138,  19),
+            new Slot(MovementSpeedUpgradeInfinite.ID,78, 51)
+    };
+
     private static final ResourceLocation TEXTURE =
             new ResourceLocation("derpymod", "textures/gui/upgrade_table.png");
 
@@ -35,32 +46,22 @@ public class UpgradeTableScreen extends Screen {
         Player player = minecraft.player;
 
         if (player != null) {
-            // Define upgrade keys corresponding to positions
-            String[] upgradeKeys = {
-                    "bowDamageUpgradeInfinite",
-                    "swordDamageUpgradeInfinite",
-                    "armourUpgradeInfinite",
-                    "maxHealthUpgradeInfinite",
-                    "movementSpeedUpgradeInfinite"
-            };
-
             // Iterate over upgrade keys and positions
-            for (int i = 0; i < upgradeKeys.length; i++) {
-                String upgradeKey = upgradeKeys[i];
-                int finalI = i;
-//                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-//                    var upgrade = upgradeData.getUpgrade(upgradeKey);
-//                    if (upgrade != null) {
-//                        Component tooltip = Component.literal(upgrade.getName() + "\nCost: " + upgrade.calculateEffectiveCost());
-//                        Button button = Button.builder(Component.empty(), button1 -> onButtonClicked(upgradeKey))
-//                                .pos(x + upgrade.getX(), y + upgrade.getY())
-//                                .size(20, 20)
-//                                .tooltip(Tooltip.create(tooltip))
-//                                .build();
-//                        button.setAlpha(0);
-//                        addRenderableWidget(button);
-//                    }
-//                });
+            for (Slot slot : SLOTS) {
+                String upgradeId = slot.upgradeId;
+                player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
+                    var upgrade = upgradeData.getUpgrade(upgradeId);
+                    if (upgrade != null) {
+                        Component tooltip = Component.literal(upgrade.getDisplayName() + "\nCost: " + upgrade.calculateCost(upgrade.getLevel()+1));
+                        Button button = Button.builder(Component.empty(), button1 -> onButtonClicked(upgradeId))
+                                .pos(x + slot.x, y + slot.y)
+                                .size(20, 20)
+                                .tooltip(Tooltip.create(tooltip))
+                                .build();
+                        button.setAlpha(0);
+                        addRenderableWidget(button);
+                    }
+                });
             }
         } else {
             throw new IllegalStateException("Player not found.");

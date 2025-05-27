@@ -1,6 +1,7 @@
 package com.derp.derpymod.arena.upgrades.leveledupgrades;
 
 import com.derp.derpymod.arena.upgrades.LeveledUpgrade;
+import com.derp.derpymod.util.AttributeModifierUtils;
 import com.derp.derpymod.util.SwordDamageUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -18,25 +19,35 @@ public class MaxHealthUpgradeInfinite extends LeveledUpgrade {
     private static final UUID MAX_HEALTH_MODIFIER_UUID = UUID.fromString("423e4567-e89b-12d3-a456-426614174000");
 
     public MaxHealthUpgradeInfinite() {
-        super(ID, 999);
+        super(ID, 999, "Increase max health");
     }
 
     @Override
     protected void applyLevel(Player player, int level) {
-        addMaxHealthModifier(player, 2 * level);
+        AttributeModifierUtils.applyModifier(
+                player,
+                Attributes.MAX_HEALTH,
+                MAX_HEALTH_MODIFIER_UUID,
+                getDisplayName(),
+                level * 2,
+                AttributeModifier.Operation.ADDITION
+        );
     }
 
     @Override
-    public double calculateCost(int level) {
-        return (100 * level);
+    public void reset(Player player) {
+        // clear out any old armour modifier
+        AttributeModifierUtils.removeModifier(
+                player,
+                Attributes.MAX_HEALTH,
+                MAX_HEALTH_MODIFIER_UUID
+        );
+        player.setHealth(20);
+        super.reset(player);
     }
 
-    private  void addMaxHealthModifier(Player player, double amount) {
-        var maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
-        if (maxHealth != null) {
-            maxHealth.removeModifier(MAX_HEALTH_MODIFIER_UUID);
-            maxHealth.addPermanentModifier(new AttributeModifier(MAX_HEALTH_MODIFIER_UUID, "Max health modifier", amount, AttributeModifier.Operation.ADDITION));
-            player.setHealth(player.getHealth());
-        }
+    @Override
+    public int calculateCost(int level) {
+        return (100 * level);
     }
 }

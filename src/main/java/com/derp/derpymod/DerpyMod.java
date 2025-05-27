@@ -284,8 +284,6 @@ public class DerpyMod {
             Player oldPlayer = event.getOriginal();
             Player newPlayer = event.getEntity();
             oldPlayer.reviveCaps();
-            var debug = oldPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA);
-            var debug2 = newPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA);
 
             oldPlayer.getCapability(PlayerDataProvider.PLAYER_DATA).ifPresent(oldStore -> {
                 newPlayer.getCapability(PlayerDataProvider.PLAYER_DATA).ifPresent(newStore -> {
@@ -305,21 +303,14 @@ public class DerpyMod {
                 });
             });
 
-            if (oldPlayer.getPersistentData().contains("customMaxHealth1")) {
-                double maxHealthAmount = oldPlayer.getPersistentData().getDouble("customMaxHealth1");
-                AttributeModifierUtils.addModifier(newPlayer, Attributes.MAX_HEALTH, UUID.fromString("523e4567-e89b-12d3-a456-426614174000"), "Max health modifier", maxHealthAmount, "customMaxHealth");
-            }
+            oldPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(oldUp ->
+                    newPlayer.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(newUp -> {
+                        // 1) Copy the raw upgrade levels into the brand-new capability
+                        newUp.copyFrom(oldUp);
 
-            // Reapply armour modifier
-            if (oldPlayer.getPersistentData().contains("customArmour1")) {
-                double armourAmount = oldPlayer.getPersistentData().getDouble("customArmour1");
-                AttributeModifierUtils.addModifier(newPlayer, Attributes.ARMOR, UUID.fromString("623e4567-e89b-12d3-a456-426614174000"), "Armour modifier", armourAmount, "customArmour1");
-            }
-
-            // Reapply armour modifier
-            if (oldPlayer.getPersistentData().contains("baseArmour")) {
-                AttributeModifierUtils.addModifier(newPlayer, Attributes.ARMOR, UUID.fromString("223e4567-e89b-12d3-a456-426614174000"), "Armour modifier", 5, "baseArmour");
-            }
+                        // 2) Apply each upgrade onto the new player so their attributes get set
+                        newUp.getUpgrades().forEach(up -> up.apply(newPlayer));
+                    }));
         }
     }
 

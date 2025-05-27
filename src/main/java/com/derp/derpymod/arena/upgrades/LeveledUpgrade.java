@@ -9,10 +9,12 @@ import net.minecraft.world.entity.player.Player;
 public abstract class LeveledUpgrade implements IUpgrade {
     private final String id;
     private final int maxLevel;
+    private final String displayName;
     private int level = 0;
-    protected LeveledUpgrade(String id, int maxLevel) {
+    protected LeveledUpgrade(String id, int maxLevel, String displayName) {
         this.id = id;
         this.maxLevel = maxLevel;
+        this.displayName = displayName;
     }
 
     @Override public String getId() { return id; }
@@ -40,13 +42,18 @@ public abstract class LeveledUpgrade implements IUpgrade {
     protected abstract void applyLevel(Player p, int level);
 
     @Override
-    public void reset() {
+    public void reset(Player player) {
         level = 0;
     }
 
     @Override
     public int getLevel() {
         return level;
+    }
+
+    @Override
+    public String getDisplayName() {
+        return displayName;
     }
 
 
@@ -79,6 +86,4 @@ public abstract class LeveledUpgrade implements IUpgrade {
                         .withStyle(ChatFormatting.GREEN)
         );
     }
-
-    public abstract double calculateCost(int level);
 }

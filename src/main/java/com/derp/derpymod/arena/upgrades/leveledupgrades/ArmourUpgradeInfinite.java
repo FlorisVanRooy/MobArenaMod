@@ -1,6 +1,7 @@
 package com.derp.derpymod.arena.upgrades.leveledupgrades;
 
 import com.derp.derpymod.arena.upgrades.LeveledUpgrade;
+import com.derp.derpymod.util.AttributeModifierUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,25 +18,35 @@ public class ArmourUpgradeInfinite extends LeveledUpgrade {
 
 
     public ArmourUpgradeInfinite() {
-        super(ID, 999);
+        super(ID, 999, "Upgrade armour");
     }
 
     @Override
     protected void applyLevel(Player player, int level) {
-        addArmourModifier(player, level);
+        // level == number of armour points to add
+        AttributeModifierUtils.applyModifier(
+                player,
+                Attributes.ARMOR,
+                ARMOUR_MODIFIER_UUID,
+                getDisplayName(),
+                level,
+                AttributeModifier.Operation.ADDITION
+        );
     }
 
     @Override
-    public double calculateCost(int level) {
-        return (100 * level);
+    public void reset(Player player) {
+        // clear out any old armour modifier
+        AttributeModifierUtils.removeModifier(
+                player,
+                Attributes.ARMOR,
+                ARMOUR_MODIFIER_UUID
+        );
+        super.reset(player);
     }
 
-    private void addArmourModifier(Player player, double amount) {
-        var armour = player.getAttribute(Attributes.ARMOR);
-        if (armour != null) {
-            armour.removeModifier(ARMOUR_MODIFIER_UUID);
-            armour.addPermanentModifier(new AttributeModifier(ARMOUR_MODIFIER_UUID, "Armour modifier", amount, AttributeModifier.Operation.ADDITION));
-            System.out.println("Changed player armour");
-        }
+    @Override
+    public int calculateCost(int level) {
+        return (100 * level);
     }
 }

@@ -96,7 +96,7 @@ public class LossHandler {
                 // Reset non-permanent
                 upgData.getUpgrades().stream()
                         .filter(u -> !u.isPermanent())
-                        .forEach(IUpgrade::reset);
+                        .forEach(upgrade -> upgrade.reset(serverPlayer));
 
                 // Re-apply all remaining (permanent) upgrades
                 upgData.getUpgrades().stream()

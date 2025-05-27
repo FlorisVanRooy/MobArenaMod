@@ -10,7 +10,7 @@ public class SwordDamageUpgradeInfinite extends LeveledUpgrade {
     public static final String ID = "sword_damage_inf";
 
     public SwordDamageUpgradeInfinite() {
-        super(ID, 999);
+        super(ID, 999, "Upgrade sword damage");
     }
 
     @Override
@@ -26,7 +26,7 @@ public class SwordDamageUpgradeInfinite extends LeveledUpgrade {
     }
 
     @Override
-    public double calculateCost(int level) {
+    public int calculateCost(int level) {
         return ((100 * (level)));
 
     }

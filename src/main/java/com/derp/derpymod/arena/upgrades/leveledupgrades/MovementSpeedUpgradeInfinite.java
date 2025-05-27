@@ -1,6 +1,7 @@
 package com.derp.derpymod.arena.upgrades.leveledupgrades;
 
 import com.derp.derpymod.arena.upgrades.LeveledUpgrade;
+import com.derp.derpymod.util.AttributeModifierUtils;
 import com.derp.derpymod.util.SwordDamageUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -18,16 +19,34 @@ public class MovementSpeedUpgradeInfinite extends LeveledUpgrade {
     private static final UUID MOVEMENT_SPEED_MODIFIER_UUID = UUID.fromString("323e4567-e89b-12d3-a456-426614174000");
 
     public MovementSpeedUpgradeInfinite() {
-        super(ID, 999);
+        super(ID, 999, "Increase movement speed");
     }
 
     @Override
     protected void applyLevel(Player player, int level) {
-        addMovementSpeedModifier(player, 0.01 * level);
+        AttributeModifierUtils.applyModifier(
+                player,
+                Attributes.MOVEMENT_SPEED,
+                MOVEMENT_SPEED_MODIFIER_UUID,
+                getDisplayName(),
+                level * 0.01,
+                AttributeModifier.Operation.ADDITION
+        );
     }
 
     @Override
-    public double calculateCost(int level) {
+    public void reset(Player player) {
+        // clear out any old armour modifier
+        AttributeModifierUtils.removeModifier(
+                player,
+                Attributes.MOVEMENT_SPEED,
+                MOVEMENT_SPEED_MODIFIER_UUID
+        );
+        super.reset(player);
+    }
+
+    @Override
+    public int calculateCost(int level) {
         return (100 * level);
     }
 

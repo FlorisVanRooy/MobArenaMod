@@ -10,7 +10,7 @@ public class BowDamageUpgradeInfinite extends LeveledUpgrade {
     public static final String ID = "bow_damage_inf";
 
     public BowDamageUpgradeInfinite() {
-        super(ID, 999);
+        super(ID, 999, "Upgrade bow damage");
     }
 
     @Override
@@ -19,7 +19,7 @@ public class BowDamageUpgradeInfinite extends LeveledUpgrade {
     }
 
     @Override
-    public double calculateCost(int level) {
+    public int calculateCost(int level) {
 
         return (100 * level);
     }

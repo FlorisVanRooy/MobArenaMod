@@ -9,7 +9,9 @@ public interface IUpgrade {
     boolean purchase(Player player);
     void save(CompoundTag tag);
     void load(CompoundTag tag);
+    int calculateCost(int level);
     default boolean isPermanent() { return false; }
-    default void reset() { }
+    default void reset(Player player) { }
     default int getLevel() { return 0;}
+    default String getDisplayName() { return ""; }
 }

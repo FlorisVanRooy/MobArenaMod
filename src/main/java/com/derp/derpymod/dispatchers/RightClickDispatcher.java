@@ -173,7 +173,7 @@ public class RightClickDispatcher {
         register(Items.FERMENTED_SPIDER_EYE, (player, world, event) -> {
                 player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
                     for (IUpgrade upgrade : upgradeData.getUpgrades()) {
-                        upgrade.reset();
+                        upgrade.reset(player);
                     }
                 });
             for (ItemStack stack : player.getInventory().items) {

@@ -23,11 +23,6 @@ public abstract class OneTimeUpgrade implements IUpgrade {
     @Override public void load(CompoundTag tag) { unlocked = tag.getBoolean("unlocked"); }
 
     @Override
-    public void reset() {
-        unlocked = false;
-    }
-
-    @Override
     public int getLevel() {
         return unlocked ? 1 : 0;
     }
