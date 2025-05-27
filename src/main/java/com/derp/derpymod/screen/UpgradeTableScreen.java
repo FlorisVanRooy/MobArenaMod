@@ -1,6 +1,7 @@
 package com.derp.derpymod.screen;
 
 import com.derp.derpymod.arena.upgrades.leveledupgrades.*;
+import com.derp.derpymod.arena.upgrades.onetimeupgrades.MinigunUnlock;
 import com.derp.derpymod.capabilities.CurrencyDataProvider;
 import com.derp.derpymod.capabilities.UpgradeDataProvider;
 import com.derp.derpymod.network.PacketHandler;
@@ -22,8 +23,9 @@ public class UpgradeTableScreen extends Screen {
             new Slot(BowDamageUpgradeInfinite.ID,    18,  19),
             new Slot(SwordDamageUpgradeInfinite.ID,  58,  19),
             new Slot(ArmourUpgradeInfinite.ID,       98,  19),
-            new Slot(MaxHealthUpgradeInfinite.ID,   138,  19),
-            new Slot(MovementSpeedUpgradeInfinite.ID,78, 51)
+            new Slot(MaxHealthUpgradeInfinite.ID,    138,  19),
+            new Slot(MovementSpeedUpgradeInfinite.ID,18,  49),
+            new Slot(MinigunUnlock.ID,               58,  49)
     };
 
     private static final ResourceLocation TEXTURE =

@@ -1,7 +1,5 @@
 package com.derp.derpymod.arena.guns;
 
-import com.derp.derpymod.damagesource.CustomDamageSource;
-import com.derp.derpymod.damagesource.ModDamageTypes;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.world.damagesource.DamageSource;
