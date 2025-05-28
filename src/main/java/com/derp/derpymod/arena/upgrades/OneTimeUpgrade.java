@@ -15,15 +15,7 @@ public abstract class OneTimeUpgrade implements IUpgrade {
     @Override public String getId() { return id; }
     @Override
     public boolean purchase(Player player) {
-        // 1) Check currency
-        if (!hasEnoughCurrency(player)) {
-            player.sendSystemMessage(
-                    Component.literal("Not enough currency to unlock " + displayName + "!")
-                            .withStyle(ChatFormatting.BOLD, ChatFormatting.RED)
-            );
-            return false;
-        }
-        // 2) Already unlocked?
+
         if (unlocked) {
             player.sendSystemMessage(
                     Component.literal(displayName + " is already unlocked")
@@ -31,11 +23,18 @@ public abstract class OneTimeUpgrade implements IUpgrade {
             );
             return false;
         }
-        // 3) Deduct cost & flip flag
+
+        if (!hasEnoughCurrency(player)) {
+            player.sendSystemMessage(
+                    Component.literal("Not enough currency to unlock " + displayName + "!")
+                            .withStyle(ChatFormatting.BOLD, ChatFormatting.RED)
+            );
+            return false;
+        }
+
         payUpgrade(player);
         unlocked = true;
 
-        // 4) Confirm & apply effect
         confirmationMessage(player);
         applyUnlocked(player);
         return true;

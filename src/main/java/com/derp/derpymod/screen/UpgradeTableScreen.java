@@ -1,5 +1,7 @@
 package com.derp.derpymod.screen;
 
+import com.derp.derpymod.arena.upgrades.LeveledUpgrade;
+import com.derp.derpymod.arena.upgrades.OneTimeUpgrade;
 import com.derp.derpymod.arena.upgrades.leveledupgrades.*;
 import com.derp.derpymod.arena.upgrades.onetimeupgrades.MinigunUnlock;
 import com.derp.derpymod.capabilities.CurrencyDataProvider;
@@ -54,7 +56,20 @@ public class UpgradeTableScreen extends Screen {
                 player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
                     var upgrade = upgradeData.getUpgrade(upgradeId);
                     if (upgrade != null) {
-                        Component tooltip = Component.literal(upgrade.getDisplayName() + "\nCost: " + upgrade.calculateCost(upgrade.getLevel()+1));
+                        String costText;
+
+                        // Check for maxed-out upgrade or already-unlocked one-time
+                        if (upgrade instanceof OneTimeUpgrade oneTime && oneTime.getLevel() == 1) {
+                            costText = "MAX";
+                        } else if (upgrade instanceof LeveledUpgrade leveled && leveled.getLevel() >= leveled.getMaxLevel()) {
+                            costText = "MAX";
+                        } else {
+                            int cost = upgrade.calculateCost(upgrade.getLevel() + 1);
+                            costText = String.valueOf(cost);
+                        }
+
+                        Component tooltip = Component.literal(upgrade.getDisplayName() + "\nCost: " + costText);
+
                         Button button = Button.builder(Component.empty(), button1 -> onButtonClicked(upgradeId))
                                 .pos(x + slot.x, y + slot.y)
                                 .size(20, 20)

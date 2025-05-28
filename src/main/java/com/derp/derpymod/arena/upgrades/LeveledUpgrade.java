@@ -20,14 +20,14 @@ public abstract class LeveledUpgrade implements IUpgrade {
     @Override public String getId() { return id; }
 
     public boolean purchase(Player player) {
-        if (!hasEnoughCurrency(player)) {
-            player.sendSystemMessage(Component.literal("You don't have enough currency!")
-                    .withStyle(ChatFormatting.BOLD, ChatFormatting.AQUA));
+        if (level >= maxLevel) {
+            player.sendSystemMessage(Component.literal("You already have the maximum level!").withStyle(ChatFormatting.BOLD, ChatFormatting.DARK_AQUA));
             return false;
         }
 
-        if (level >= maxLevel) {
-            player.sendSystemMessage(Component.literal("You already have the maximum level!").withStyle(ChatFormatting.BOLD, ChatFormatting.DARK_AQUA));
+        if (!hasEnoughCurrency(player)) {
+            player.sendSystemMessage(Component.literal("You don't have enough currency!")
+                    .withStyle(ChatFormatting.BOLD, ChatFormatting.AQUA));
             return false;
         }
 
@@ -54,6 +54,10 @@ public abstract class LeveledUpgrade implements IUpgrade {
     @Override
     public String getDisplayName() {
         return displayName;
+    }
+
+    public int getMaxLevel() {
+        return maxLevel;
     }
 
 
