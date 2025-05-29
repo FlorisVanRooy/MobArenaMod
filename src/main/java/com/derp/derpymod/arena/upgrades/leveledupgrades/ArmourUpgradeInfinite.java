@@ -11,11 +11,10 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.UUID;
 
+import static com.derp.derpymod.util.AttributeModifierUUIDs.INFINITE_ARMOUR;
+
 public class ArmourUpgradeInfinite extends LeveledUpgrade {
     public static final String ID = "armour_inf";
-
-    private static final UUID ARMOUR_MODIFIER_UUID = UUID.fromString("723e4567-e89b-12d3-a456-426614174000");
-
 
     public ArmourUpgradeInfinite() {
         super(ID, 999, "Upgrade armour");
@@ -27,7 +26,7 @@ public class ArmourUpgradeInfinite extends LeveledUpgrade {
         AttributeModifierUtils.applyModifier(
                 player,
                 Attributes.ARMOR,
-                ARMOUR_MODIFIER_UUID,
+                INFINITE_ARMOUR,
                 getDisplayName(),
                 level,
                 AttributeModifier.Operation.ADDITION
@@ -40,7 +39,7 @@ public class ArmourUpgradeInfinite extends LeveledUpgrade {
         AttributeModifierUtils.removeModifier(
                 player,
                 Attributes.ARMOR,
-                ARMOUR_MODIFIER_UUID
+                INFINITE_ARMOUR
         );
         super.reset(player);
     }

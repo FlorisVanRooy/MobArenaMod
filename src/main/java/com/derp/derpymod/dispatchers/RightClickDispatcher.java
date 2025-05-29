@@ -32,6 +32,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.derp.derpymod.util.AttributeModifierUUIDs.BASE_ARMOUR;
+import static com.derp.derpymod.util.AttributeModifierUUIDs.SWORD_DAMAGE;
+
 public class RightClickDispatcher {
     private static final Map<Item, IRightClickHandler> MAP = new HashMap<>();
 
@@ -201,7 +204,7 @@ public class RightClickDispatcher {
             modifierTag.putString("AttributeName", "generic.attack_damage");
             modifierTag.putDouble("Amount", 4);
             modifierTag.putInt("Operation", AttributeModifier.Operation.ADDITION.toValue());
-            modifierTag.putUUID("UUID", UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
+            modifierTag.putUUID("UUID", SWORD_DAMAGE);
             modifierTag.putString("Name", "generic.attack_damage");
             modifierTag.putString("Slot", "mainhand");
 
@@ -222,7 +225,7 @@ public class RightClickDispatcher {
 
             // alternative armour
             var armour = player.getAttribute(Attributes.ARMOR);
-            UUID armourModifierId = UUID.fromString("223e4567-e89b-12d3-a456-426614174000");
+            UUID armourModifierId = BASE_ARMOUR;
             if (armour != null) {
                 armour.removeModifier(armourModifierId);
                 armour.addPermanentModifier(new AttributeModifier(armourModifierId, "Armour modifier", 5, AttributeModifier.Operation.ADDITION));

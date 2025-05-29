@@ -14,9 +14,10 @@ import net.minecraft.world.item.Items;
 
 import java.util.UUID;
 
+import static com.derp.derpymod.util.AttributeModifierUUIDs.INFINITE_MAX_HEALTH;
+
 public class MaxHealthUpgradeInfinite extends LeveledUpgrade {
     public static final String ID = "max_health_inf";
-    private static final UUID MAX_HEALTH_MODIFIER_UUID = UUID.fromString("423e4567-e89b-12d3-a456-426614174000");
 
     public MaxHealthUpgradeInfinite() {
         super(ID, 999, "Increase max health");
@@ -27,7 +28,7 @@ public class MaxHealthUpgradeInfinite extends LeveledUpgrade {
         AttributeModifierUtils.applyModifier(
                 player,
                 Attributes.MAX_HEALTH,
-                MAX_HEALTH_MODIFIER_UUID,
+                INFINITE_MAX_HEALTH,
                 getDisplayName(),
                 level * 2,
                 AttributeModifier.Operation.ADDITION
@@ -40,7 +41,7 @@ public class MaxHealthUpgradeInfinite extends LeveledUpgrade {
         AttributeModifierUtils.removeModifier(
                 player,
                 Attributes.MAX_HEALTH,
-                MAX_HEALTH_MODIFIER_UUID
+                INFINITE_MAX_HEALTH
         );
         player.setHealth(20);
         super.reset(player);

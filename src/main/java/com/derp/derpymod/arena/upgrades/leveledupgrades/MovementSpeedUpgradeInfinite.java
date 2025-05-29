@@ -14,9 +14,10 @@ import net.minecraft.world.item.Items;
 
 import java.util.UUID;
 
+import static com.derp.derpymod.util.AttributeModifierUUIDs.INFINITE_MOVEMENT_SPEED;
+
 public class MovementSpeedUpgradeInfinite extends LeveledUpgrade {
     public static final String ID = "movement_speed_inf";
-    private static final UUID MOVEMENT_SPEED_MODIFIER_UUID = UUID.fromString("323e4567-e89b-12d3-a456-426614174000");
 
     public MovementSpeedUpgradeInfinite() {
         super(ID, 999, "Increase movement speed");
@@ -27,7 +28,7 @@ public class MovementSpeedUpgradeInfinite extends LeveledUpgrade {
         AttributeModifierUtils.applyModifier(
                 player,
                 Attributes.MOVEMENT_SPEED,
-                MOVEMENT_SPEED_MODIFIER_UUID,
+                INFINITE_MOVEMENT_SPEED,
                 getDisplayName(),
                 level * 0.01,
                 AttributeModifier.Operation.ADDITION
@@ -40,7 +41,7 @@ public class MovementSpeedUpgradeInfinite extends LeveledUpgrade {
         AttributeModifierUtils.removeModifier(
                 player,
                 Attributes.MOVEMENT_SPEED,
-                MOVEMENT_SPEED_MODIFIER_UUID
+                INFINITE_MOVEMENT_SPEED
         );
         super.reset(player);
     }
@@ -48,14 +49,5 @@ public class MovementSpeedUpgradeInfinite extends LeveledUpgrade {
     @Override
     public int calculateCost(int level) {
         return (100 * level);
-    }
-
-    private  void addMovementSpeedModifier(Player player, double amount) {
-        var movementSpeed = player.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (movementSpeed != null) {
-            movementSpeed.removeModifier(MOVEMENT_SPEED_MODIFIER_UUID);
-            movementSpeed.addPermanentModifier(new AttributeModifier(MOVEMENT_SPEED_MODIFIER_UUID, "Movement speed modifier", amount, AttributeModifier.Operation.ADDITION));
-            System.out.println("Changed player movement speed");
-        }
     }
 }

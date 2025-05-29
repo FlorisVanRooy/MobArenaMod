@@ -8,6 +8,8 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.UUID;
 
+import static com.derp.derpymod.util.AttributeModifierUUIDs.SWORD_DAMAGE;
+
 public class SwordDamageUtils {
     public static void addAttackDamageModifier(ItemStack stack, double additionalAmount) {
         ListTag modifiers = stack.getOrCreateTag().getList("AttributeModifiers", Tag.TAG_COMPOUND);
@@ -17,7 +19,7 @@ public class SwordDamageUtils {
             CompoundTag modifierTag = modifiers.getCompound(i);
             UUID uuid = modifierTag.getUUID("UUID");
 
-            if (uuid.equals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"))) {
+            if (uuid.equals(SWORD_DAMAGE)) {
                 // Found existing modifier, update its amount
                 double currentAmount = modifierTag.getDouble("Amount");
                 modifierTag.putDouble("Amount", currentAmount + additionalAmount);
@@ -32,7 +34,7 @@ public class SwordDamageUtils {
             newModifierTag.putString("AttributeName", "generic.attack_damage");
             newModifierTag.putDouble("Amount", additionalAmount);
             newModifierTag.putInt("Operation", AttributeModifier.Operation.ADDITION.toValue());
-            newModifierTag.putUUID("UUID", UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
+            newModifierTag.putUUID("UUID", SWORD_DAMAGE);
             newModifierTag.putString("Name", "generic.attack_damage");
             newModifierTag.putString("Slot", "mainhand");
 
@@ -50,7 +52,7 @@ public class SwordDamageUtils {
             CompoundTag modifierTag = modifiers.getCompound(i);
             UUID uuid = modifierTag.getUUID("UUID");
 
-            if (!uuid.equals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"))) {
+            if (!uuid.equals(SWORD_DAMAGE)) {
                 newModifiers.add(modifierTag); // Preserve other modifiers
             }
         }
