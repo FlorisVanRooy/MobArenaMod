@@ -6,6 +6,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public abstract class LeveledUpgrade implements IUpgrade {
     private final String id;
     private final int maxLevel;
@@ -68,7 +70,12 @@ public abstract class LeveledUpgrade implements IUpgrade {
 
     protected boolean hasEnoughCurrency(Player player) {
         return player.getCapability(CurrencyDataProvider.CURRENCY_DATA)
-                .map(cd -> cd.getCurrency() >= calculateCost(level + 1))
+                .map(currencyData -> {
+                    int cost = calculateCost(level + 1);
+                    return isPermanent()
+                            ? currencyData.getPermanentCurrency() >= cost
+                            : currencyData.getCurrency() >= cost;
+                })
                 .orElse(false);
     }
 
@@ -76,9 +83,15 @@ public abstract class LeveledUpgrade implements IUpgrade {
      * Deduct the cost of the *next* level from their currency.
      */
     protected void payUpgrade(Player player) {
-        player.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(cd -> {
-            cd.subtractCurrency((int) calculateCost(level));
-        });
+        player.getCapability(CurrencyDataProvider.CURRENCY_DATA)
+                .ifPresent(currencyData -> {
+                    int cost = calculateCost(level);
+                    if (isPermanent()) {
+                        currencyData.subtractPermanentCurrency(cost);
+                    } else {
+                        currencyData.subtractCurrency(cost);
+                    }
+                });
     }
 
     /**

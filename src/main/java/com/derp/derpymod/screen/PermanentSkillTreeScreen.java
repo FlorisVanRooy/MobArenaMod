@@ -1,242 +1,266 @@
 package com.derp.derpymod.screen;
 
-import com.derp.derpymod.DerpyMod;
-import com.derp.derpymod.arena.permanentskilltree.SkillTreeType;
-import com.derp.derpymod.capabilities.CurrencyDataProvider;
+import com.derp.derpymod.arena.permanentskilltree.SkillNode;
+import com.derp.derpymod.arena.permanentskilltree.SkillTree;
+import com.derp.derpymod.arena.permanentskilltree.SkillTreeRegistry;
+import com.derp.derpymod.arena.upgrades.IUpgrade;
+import com.derp.derpymod.arena.upgrades.LeveledUpgrade;
+import com.derp.derpymod.arena.upgrades.OneTimeUpgrade;
 import com.derp.derpymod.capabilities.UpgradeDataProvider;
 import com.derp.derpymod.network.PacketHandler;
 import com.derp.derpymod.packets.CBuyUpgradePacket;
-import com.derp.derpymod.util.TabButton;
-import com.derp.derpymod.util.UpgradeButton;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.*;
+import java.util.Map;
 
 public class PermanentSkillTreeScreen extends Screen {
-    private static final ResourceLocation BACKGROUND_TEXTURE =
-            new ResourceLocation(DerpyMod.MODID, "textures/gui/permanent_skill_tree_background.png");
-    private static final ResourceLocation DEFENCE_TREE_TEXTURE =
-            new ResourceLocation(DerpyMod.MODID, "textures/gui/permanent_skill_tree_defence_foreground.png");
-    private static final ResourceLocation MELEE_TREE_TEXTURE =
-            new ResourceLocation(DerpyMod.MODID, "textures/gui/permanent_skill_tree_melee_foreground.png");
-    private static final ResourceLocation MAGIC_TREE_TEXTURE =
-            new ResourceLocation(DerpyMod.MODID, "textures/gui/permanent_skill_tree_magic_foreground.png");
-    private static final ResourceLocation CHECKMARK_TEXTURE = new ResourceLocation(DerpyMod.MODID, "textures/gui/checkmarkk.png");
-    private final Map<String, UpgradeButton> upgradeButtons = new HashMap<>();
+    private static final ResourceLocation BACKGROUND =
+            new ResourceLocation("derpymod","textures/gui/permanent_skill_tree_background.png");
+    private static final ResourceLocation FOREGROUND =
+            new ResourceLocation("derpymod","textures/gui/permanent_skill_tree_defence_foreground.png");
 
-    private ResourceLocation currentForegroundTexture;
-    private SkillTreeType currentSkillTreeType = SkillTreeType.DEFENSE;
-    private final int imageWidth = 176;
-    private final int imageHeight = 166;
-    private final int foregroundWidth = 256;
-    private final int foregroundHeight = 256;
+    // -- dimensions --
+    private final int guiW = 176, guiH = 166;        // visible GUI window
+    private final int canvasW = 256, canvasH = 256;  // full PNG size
 
-    // Variables for dragging
-    private int contentOffsetX = 0; // Offset for the content inside the GUI
-    private int contentOffsetY = 0;
-    private boolean isDragging = false;
-    private boolean isClicking = false;
-    private int lastMouseX, lastMouseY;
+    // -- pan & drag state --
+    private int offsetX = 0, offsetY = 0;
+    private boolean dragging = false;
+    private int dragStartX, dragStartY;
 
-    public PermanentSkillTreeScreen(Component p_97743_) {
-        super(p_97743_);
+    // -- category tabs --
+    private String currentCategory = "defense";
+
+    public PermanentSkillTreeScreen(Component title) {
+        super(title);
     }
 
     @Override
     protected void init() {
         super.init();
-
-        // Tab buttons
-        addRenderableWidget(new TabButton(this, width / 2 - imageWidth / 2, height / 2 - 98, imageWidth / 3, 15, SkillTreeType.DEFENSE, "Defense"));
-        addRenderableWidget(new TabButton(this, width / 2 - imageWidth / 2 + imageWidth / 3, height / 2 - 98, imageWidth / 3, 15, SkillTreeType.MELEE, "Melee"));
-        addRenderableWidget(new TabButton(this, width / 2 - imageWidth / 2 + imageWidth / 3 * 2, height / 2 - 98, imageWidth / 3, 15, SkillTreeType.MAGIC, "Magic"));
-
-        loadSkillTree(currentSkillTreeType); // Load the default skill tree
+        // create category tabs
+        int x0 = (width - guiW)/2;
+        int y0 = (height - guiH)/2 - 20;
+        int i = 0;
+        for (String cat : SkillTreeRegistry.categories()) {
+            Button tab = Button.builder(Component.literal(cat.toUpperCase()), b -> {
+                        currentCategory = cat;
+                        rebuildWidgets();
+                    })
+                    .pos(x0 + i*60, y0)
+                    .size(58, 20)
+                    .build();
+            addRenderableWidget(tab);
+            i++;
+        }
+        // initial node buttons
+        rebuildWidgets();
     }
 
-    public void loadSkillTree(SkillTreeType type) {
-        // Update the current skill tree type
-        currentSkillTreeType = type;
+    /** Clear & recreate all node buttons at current offsets/category */
+    protected void rebuildWidgets() {
+        clearWidgets();
+        SkillTree tree = SkillTreeRegistry.get(currentCategory);
+        if (tree == null) return;
 
-        // Existing logic to load the skill tree
-        upgradeButtons.clear();
-        Player player = getMinecraft().player;
-        contentOffsetX = 0;
-        contentOffsetY = 0;
+        Player p = minecraft.player;
+        int baseX = (width - guiW)/2;
+        int baseY = (height - guiH)/2;
 
-        switch (type) {
-            case DEFENSE:
-                currentForegroundTexture = DEFENCE_TREE_TEXTURE;
-                break;
-            case MELEE:
-                currentForegroundTexture = MELEE_TREE_TEXTURE;
-                break;
-            case MAGIC:
-                currentForegroundTexture = MAGIC_TREE_TEXTURE;
-                break;
-            default:
-                currentForegroundTexture = DEFENCE_TREE_TEXTURE;
-        }
+        tree.nodes.forEach(node -> {
+            int bx = baseX + node.x + offsetX;
+            int by = baseY + node.y + offsetY;
 
-        player.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(upgradeData -> {
-//            for (var upgrade : upgradeData.getUpgrades()) {
-//                if (upgrade.isPermanent() && upgrade.getType() == type) {
-//                    upgradeButtons.put(upgrade.getId(), new UpgradeButton(upgrade.getX(), upgrade.getY(), 20, 20, upgrade.getName(), upgrade.calculateEffectiveCost()));
-//                }
-//            }
+            p.getCapability(UpgradeDataProvider.UPGRADE_DATA).ifPresent(data -> {
+                IUpgrade up = data.getUpgrade(node.upgradeId);
+                if (up == null) return;
+
+                boolean maxed;
+                if (up instanceof LeveledUpgrade lvl) {
+                    maxed = up.getLevel() >= lvl.getMaxLevel();
+                } else if (up instanceof OneTimeUpgrade ot) {
+                    maxed = up.getLevel() == 1;
+                } else {
+                    maxed = false;
+                }
+
+                String cost = maxed
+                        ? "MAX"
+                        : String.valueOf(up.calculateCost(up.getLevel() + 1));
+
+                Component tip = Component.literal(up.getDisplayName() + "\nCost: " + cost);
+
+                Button btn = Button.builder(Component.empty(), b -> {
+                            if (!dragging && !maxed && prereqsMet(node, p)) {
+                                PacketHandler.sendToServer(new CBuyUpgradePacket(node.upgradeId));
+                            }
+                        })
+                        .pos(bx, by)
+                        .size(20, 20)
+                        .tooltip(Tooltip.create(tip))
+                        .build();
+
+                btn.setAlpha(0);
+
+                addRenderableWidget(btn);
+            });
         });
     }
 
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-
-        // Calculate base x and y for centering
-        int x = (width - imageWidth) / 2;
-        int y = (height - imageHeight) / 2;
-
-        // Render tab buttons
-        for (var widget : this.renderables) {
-            if (widget instanceof TabButton) {
-                widget.render(guiGraphics, mouseX, mouseY, partialTick);
+    /** All prerequisites of this node must be satisfied */
+    private boolean prereqsMet(SkillNode node, Player p) {
+        var data = p.getCapability(UpgradeDataProvider.UPGRADE_DATA)
+                .orElseThrow(() -> new RuntimeException("No upgrade data"));
+        for (Map.Entry<String,Integer> req : node.prereq.entrySet()) {
+            var u2 = data.getUpgrade(req.getKey());
+            if (u2 == null || u2.getLevel() < req.getValue()) {
+                p.sendSystemMessage(Component.literal("Previous upgrade levels too low").withStyle(ChatFormatting.RED));
+                return false;
             }
         }
+        return true;
+    }
 
-        // Render the static background (stays fixed)
-        guiGraphics.blit(BACKGROUND_TEXTURE, x, y, 0, 0, imageWidth, imageHeight);
+    @Override
+    public void render(GuiGraphics g, int mx, int my, float pt) {
+        // 1) Draw static GUI background
+        int x0 = (width - guiW) / 2;
+        int y0 = (height - guiH) / 2;
+        RenderSystem.setShaderTexture(0, BACKGROUND);
+        g.blit(BACKGROUND, x0, y0, 0, 0, guiW, guiH);
 
-        // Define padding
-        int topPadding = 15; // 15 pixels padding from the top
-        int sidePadding = 10; // 10 pixels padding on other sides
+        // 2) Enable scissor to clip the FG – inset by 5px on each side
+        int pad = 5;
+        int insetX = x0 + pad;
+        int insetY = y0 + pad;
+        int insetW = guiW - pad * 2;
+        int insetH = guiH - pad * 2;
 
-        // Setup scissor box to restrict rendering area (to prevent overlap with text and add padding)
-        int scissorX = x + sidePadding;
-        int scissorY = y + topPadding;
-        int scissorWidth = imageWidth - 2 * sidePadding;
-        int scissorHeight = imageHeight - topPadding - sidePadding;
+        double scale = minecraft.getWindow().getGuiScale();
+        int sx = (int)(insetX * scale);
+        int sy = (int)((minecraft.getWindow().getHeight() - (insetY + insetH) * scale));
+        int sw = (int)(insetW * scale);
+        int sh = (int)(insetH * scale);
 
-        // Convert scissor coordinates to OpenGL screen coordinates
-        double scale = getMinecraft().getWindow().getGuiScale();
-        int scissorXScaled = (int) (scissorX * scale);
-        int scissorYScaled = (int) (getMinecraft().getWindow().getHeight() - (scissorY + scissorHeight) * scale);
-        int scissorWidthScaled = (int) (scissorWidth * scale);
-        int scissorHeightScaled = (int) (scissorHeight * scale);
+        RenderSystem.enableScissor(sx, sy, sw, sh);
 
-        RenderSystem.enableScissor(scissorXScaled, scissorYScaled, scissorWidthScaled, scissorHeightScaled);
+        // 3) Draw the full canvas (may be larger than viewport), now clipped 5px before edges
+        RenderSystem.setShaderTexture(0, FOREGROUND);
+        g.blit(FOREGROUND,
+                x0 + offsetX, y0 + offsetY,
+                0, 0,
+                canvasW, canvasH);
 
-        // Render the draggable foreground (icons and lines)
-        guiGraphics.blit(currentForegroundTexture, contentOffsetX + x, contentOffsetY + y, 0, 0, foregroundWidth, foregroundHeight);
+        // 4) Draw connection lines
+        SkillTree tree = SkillTreeRegistry.get(currentCategory);
+        Player p = minecraft.player;
+        if (tree != null) {
+            tree.nodes.forEach(parent -> {
+                int parentX = x0 + parent.x + offsetX;
+                int parentY = y0 + parent.y + offsetY;
 
-        // Disable scissor after rendering
+                parent.prereq.keySet().forEach(childId -> {
+                    SkillNode child = tree.nodes.stream()
+                            .filter(n -> n.upgradeId.equals(childId))
+                            .findFirst().orElse(null);
+
+                    if (child != null) {
+                        int childX = x0 + child.x + offsetX;
+                        int childY = y0 + child.y + offsetY;
+
+                        var data = p.getCapability(UpgradeDataProvider.UPGRADE_DATA)
+                                .orElseThrow(() -> new RuntimeException("No upgrade data found"));
+
+                        int requiredLevel = parent.prereq.getOrDefault(child.upgradeId, 0);
+                        int parentLevel = data.getUpgrade(child.upgradeId) != null
+                                ? data.getUpgrade(child.upgradeId).getLevel()
+                                : 0;
+
+                        boolean ok = parentLevel >= requiredLevel;
+                        int color = ok ? 0xFF00FF00 : 0xFFFF0000;
+
+                        int parentEdgeX = (childX + 10) < (parentX + 10)
+                                ? parentX  // left edge of parent
+                                : parentX + 20;  // right edge of parent
+
+                        int midX = childX + 10;  // center of child button
+                        int topChildY = childY; // top of child button
+                        int midParentY = parentY + 10; // center of parent button
+
+                        // Horizontal from parent's left/right to midX
+                        g.hLine(Math.min(parentEdgeX, midX), Math.max(parentEdgeX, midX), midParentY, color);
+
+                        // Vertical down to top of child
+                        g.vLine(midX, Math.min(midParentY, topChildY), Math.max(midParentY, topChildY), color);
+                    }
+                });
+            });
+        }
+
+
+
+
+        // 5) Disable scissor so UI buttons draw normally
         RenderSystem.disableScissor();
 
-        // Render buttons on top of the foreground and check if any button is hovered
-        UpgradeButton hoveredButton = null;
-        for (UpgradeButton button : upgradeButtons.values()) {
-            int buttonX = button.getInitialX() + contentOffsetX + x;
-            int buttonY = button.getInitialY() + contentOffsetY + y;
-
-            // Update button position and render
-            button.setPosition(buttonX, buttonY);
-            button.render(guiGraphics);
-
-            // Check if the upgrade is purchased, if so, draw a checkmark
-            if (isUpgradePurchased(button)) {  // Replace this with your actual condition
-                guiGraphics.blit(CHECKMARK_TEXTURE, buttonX, buttonY, 0, 0, 20, 20);
-            }
-
-            if (button.isHovered(mouseX, mouseY)) {
-                hoveredButton = button;
-            }
-        }
-
-        // Render tooltip if hovering over a button
-        if (hoveredButton != null) {
-            List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal(hoveredButton.getUpgradeName()));
-            tooltip.add(Component.literal("Cost: " + hoveredButton.getCostTooltip()));
-
-            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
-        }
-
-        // Render currency information (outside the scissor box)
-        getMinecraft().player.getCapability(CurrencyDataProvider.CURRENCY_DATA).ifPresent(currencyData -> {
-            String currencyText = "Skill points: " + currencyData.getPermanentCurrency();
-            guiGraphics.drawString(this.font, currencyText, x + 5, y + 5, 0x000000, false);
-        });
-
-        // Handle any additional elements
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        // 6) Draw all buttons and tooltips
+        super.render(g, mx, my, pt);
     }
 
-    private static final int DRAG_THRESHOLD = 5; // Minimum distance for drag detection
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0) { // Left click
-            isClicking = true;
-            lastMouseX = (int) mouseX;
-            lastMouseY = (int) mouseY;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (isClicking && button == 0) {
-            // Calculate the distance the mouse has moved
-            int dx = (int) mouseX - lastMouseX;
-            int dy = (int) mouseY - lastMouseY;
-
-            // If the mouse has moved more than the threshold, it's a drag
-            if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-                isDragging = true;
-
-                // Update the content offset
-                contentOffsetX += dx;
-                contentOffsetY += dy;
-
-                // Update last mouse positions
-                lastMouseX = (int) mouseX;
-                lastMouseY = (int) mouseY;
-            }
+    public boolean mouseClicked(double mx, double my, int btn) {
+        // Let buttons (and other widgets) handle the click first:
+        boolean handled = super.mouseClicked(mx, my, btn);
+        if (handled) {
+            // A button was clicked; don’t treat it as the start of a drag
+            return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+
+        // Otherwise, it's an empty-space click, so start panning
+        if (btn == 0) {
+            dragging = true;
+            dragStartX = (int) mx;
+            dragStartY = (int) my;
+            return true;
+        }
+        return false;
     }
+
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == 0) { // Left click
-            // If not dragging, handle the click event
-            if (!isDragging) {
-                for (Map.Entry<String, UpgradeButton> entry : upgradeButtons.entrySet()) {
-                    UpgradeButton upgradeButton = entry.getValue();
-                    if (upgradeButton.isHovered(mouseX, mouseY)) {
-                        // Execute upgrade logic
-                        //upgradeButton.setUnlocked(true);
-                        handleUpgradeClick(entry.getKey());
-                        break;
-                    }
-                }
-            }
-
-            // Reset dragging and clicking states
-            isDragging = false;
-            isClicking = false;
+    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+        if (dragging && btn == 0) {
+            int deltaX = Math.round((float)(mx - dragStartX));
+            int deltaY = Math.round((float)(my - dragStartY));
+            offsetX += deltaX;
+            offsetY += deltaY;
+            dragStartX += deltaX;
+            dragStartY += deltaY;
+            rebuildWidgets();
+            return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseDragged(mx, my, btn, dx, dy);
     }
 
-    private void handleUpgradeClick(String upgradeId) {
-        PacketHandler.sendToServer(new CBuyUpgradePacket(upgradeId));
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int btn) {
+        if (btn == 0) {
+            dragging = false;
+        }
+        return super.mouseReleased(mx, my, btn);
     }
 
+    /** Called by packet handler to refresh without reopening */
     public void refresh() {
         rebuildWidgets();
     }
@@ -244,9 +268,5 @@ public class PermanentSkillTreeScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
-    }
-
-    private boolean isUpgradePurchased(UpgradeButton button) {
-        return true;
     }
 }

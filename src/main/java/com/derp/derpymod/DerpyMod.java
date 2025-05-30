@@ -3,6 +3,7 @@ package com.derp.derpymod;
 import com.derp.derpymod.arena.LossHandler;
 import com.derp.derpymod.arena.Wave;
 import com.derp.derpymod.arena.mobs.CustomEnemy;
+import com.derp.derpymod.arena.permanentskilltree.SkillTreeRegistry;
 import com.derp.derpymod.arena.upgrades.ModUpgrades;
 import com.derp.derpymod.arena.upgrades.IUpgrade;
 import com.derp.derpymod.arena.upgrades.UpgradeRegistry;
@@ -109,6 +110,7 @@ public class DerpyMod {
 
         // register the mod upgrades
         ModUpgrades.init();
+        SkillTreeRegistry.init();
 
         // Register the item to a creative tab
 //        modEventBus.addListener(this::addCreative);
