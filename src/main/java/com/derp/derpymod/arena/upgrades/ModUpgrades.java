@@ -1,7 +1,7 @@
 package com.derp.derpymod.arena.upgrades;
 
-import com.derp.derpymod.arena.permanentskilltree.ArmourUpgrade1;
-import com.derp.derpymod.arena.permanentskilltree.MaxHealthUpgrade1;
+import com.derp.derpymod.arena.upgrades.leveledupgrades.ArmourUpgrade1;
+import com.derp.derpymod.arena.upgrades.leveledupgrades.MaxHealthUpgrade1;
 import com.derp.derpymod.arena.upgrades.leveledupgrades.*;
 import com.derp.derpymod.arena.upgrades.onetimeupgrades.MinigunUnlock;
 
@@ -15,6 +15,7 @@ public class ModUpgrades {
         UpgradeRegistry.register(ArmourUpgradeInfinite.ID, ArmourUpgradeInfinite::new);
         UpgradeRegistry.register(ArmourUpgrade1.ID, ArmourUpgrade1::new);
         UpgradeRegistry.register(MaxHealthUpgrade1.ID, MaxHealthUpgrade1::new);
+        UpgradeRegistry.register(KnockbackResistanceUpgrade1.ID, KnockbackResistanceUpgrade1::new);
 
         // One-time upgrades
         UpgradeRegistry.register(MinigunUnlock.ID, MinigunUnlock::new);

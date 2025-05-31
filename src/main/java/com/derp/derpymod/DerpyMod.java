@@ -79,7 +79,7 @@ import org.slf4j.Logger;
 import java.util.Map;
 import java.util.UUID;
 
-//import static com.derp.derpymod.arena.permanentskilltree.MaxHealthUpgrade1.MAX_HEALTH_MODIFIER1_UUID;
+//import static com.derp.derpymod.arena.upgrades.leveledupgrades.MaxHealthUpgrade1.MAX_HEALTH_MODIFIER1_UUID;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(DerpyMod.MODID)

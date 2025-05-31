@@ -19,13 +19,22 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class PermanentSkillTreeScreen extends Screen {
     private static final ResourceLocation BACKGROUND =
             new ResourceLocation("derpymod","textures/gui/permanent_skill_tree_background.png");
-    private static final ResourceLocation FOREGROUND =
-            new ResourceLocation("derpymod","textures/gui/permanent_skill_tree_defence_foreground.png");
+
+    private ResourceLocation getForegroundTexture() {
+        // Build the path: "textures/gui/permanent_skill_tree_<category>_foreground.png"
+        String texturePath = String.format("textures/gui/permanent_skill_tree_%s_foreground.png", currentCategory);
+        return new ResourceLocation("derpymod", texturePath);
+    }
+
+    // Keep a reference to each category‐tab so we can re‐add them after clearWidgets():
+    private final List<Button> tabButtons = new ArrayList<>();
 
     // -- dimensions --
     private final int guiW = 176, guiH = 166;        // visible GUI window
@@ -37,7 +46,7 @@ public class PermanentSkillTreeScreen extends Screen {
     private int dragStartX, dragStartY;
 
     // -- category tabs --
-    private String currentCategory = "defense";
+    private String currentCategory = "defence";
 
     public PermanentSkillTreeScreen(Component title) {
         super(title);
@@ -46,34 +55,50 @@ public class PermanentSkillTreeScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        // create category tabs
-        int x0 = (width - guiW)/2;
-        int y0 = (height - guiH)/2 - 20;
+
+        // -- (1) Compute where the tabs should start drawing --
+        int x0 = (width - guiW) / 2;
+        int y0 = (height - guiH) / 2 - 20;
+
+        // -- (2) Build one Button per category, store into tabButtons, AND addRenderableWidget(tab) --
+        tabButtons.clear();
         int i = 0;
         for (String cat : SkillTreeRegistry.categories()) {
             Button tab = Button.builder(Component.literal(cat.toUpperCase()), b -> {
                         currentCategory = cat;
                         rebuildWidgets();
                     })
-                    .pos(x0 + i*60, y0)
+                    .pos(x0 + i * 60, y0)
                     .size(58, 20)
                     .build();
+
+            tabButtons.add(tab);
             addRenderableWidget(tab);
             i++;
         }
-        // initial node buttons
+
+        // -- (3) Now create the node‐buttons for the initial category: --
         rebuildWidgets();
     }
 
+
     /** Clear & recreate all node buttons at current offsets/category */
     protected void rebuildWidgets() {
+        // 1) Remove ALL widgets from the screen (tabs + old node‐buttons):
         clearWidgets();
+
+        // 2) Re‐attach the tab‐buttons so they stay visible:
+        for (Button tab : tabButtons) {
+            addRenderableWidget(tab);
+        }
+
+        // 3) Now add the node‐buttons for the new category:
         SkillTree tree = SkillTreeRegistry.get(currentCategory);
         if (tree == null) return;
 
         Player p = minecraft.player;
-        int baseX = (width - guiW)/2;
-        int baseY = (height - guiH)/2;
+        int baseX = (width - guiW) / 2;
+        int baseY = (height - guiH) / 2;
 
         tree.nodes.forEach(node -> {
             int bx = baseX + node.x + offsetX;
@@ -109,11 +134,11 @@ public class PermanentSkillTreeScreen extends Screen {
                         .build();
 
                 btn.setAlpha(0);
-
                 addRenderableWidget(btn);
             });
         });
     }
+
 
     /** All prerequisites of this node must be satisfied */
     private boolean prereqsMet(SkillNode node, Player p) {
@@ -152,61 +177,81 @@ public class PermanentSkillTreeScreen extends Screen {
 
         RenderSystem.enableScissor(sx, sy, sw, sh);
 
-        // 3) Draw the full canvas (may be larger than viewport), now clipped 5px before edges
-        RenderSystem.setShaderTexture(0, FOREGROUND);
-        g.blit(FOREGROUND,
-                x0 + offsetX, y0 + offsetY,
+        // 3) Draw the full canvas (may be larger than viewport), now clipped
+        ResourceLocation foreground = getForegroundTexture();
+        RenderSystem.setShaderTexture(0, foreground);
+        g.blit(
+                foreground,
+                x0 + offsetX,
+                y0 + offsetY,
                 0, 0,
-                canvasW, canvasH);
+                canvasW, canvasH
+        );
 
-        // 4) Draw connection lines
+        // === Draw connection lines ===
         SkillTree tree = SkillTreeRegistry.get(currentCategory);
         Player p = minecraft.player;
         if (tree != null) {
-            tree.nodes.forEach(parent -> {
-                int parentX = x0 + parent.x + offsetX;
-                int parentY = y0 + parent.y + offsetY;
+            for (SkillNode child : tree.nodes) {
+                int childX = x0 + child.x + offsetX;
+                int childY = y0 + child.y + offsetY;
 
-                parent.prereq.keySet().forEach(childId -> {
-                    SkillNode child = tree.nodes.stream()
-                            .filter(n -> n.upgradeId.equals(childId))
-                            .findFirst().orElse(null);
+                for (Map.Entry<String, Integer> prereqEntry : child.prereq.entrySet()) {
+                    String parentId = prereqEntry.getKey();
+                    SkillNode parent = tree.nodes.stream()
+                            .filter(n -> n.upgradeId.equals(parentId))
+                            .findFirst()
+                            .orElse(null);
 
-                    if (child != null) {
-                        int childX = x0 + child.x + offsetX;
-                        int childY = y0 + child.y + offsetY;
+                    if (parent != null) {
+                        int parentX = x0 + parent.x + offsetX;
+                        int parentY = y0 + parent.y + offsetY;
 
                         var data = p.getCapability(UpgradeDataProvider.UPGRADE_DATA)
                                 .orElseThrow(() -> new RuntimeException("No upgrade data found"));
 
-                        int requiredLevel = parent.prereq.getOrDefault(child.upgradeId, 0);
-                        int parentLevel = data.getUpgrade(child.upgradeId) != null
-                                ? data.getUpgrade(child.upgradeId).getLevel()
+                        int requiredLevel = child.prereq.getOrDefault(parent.upgradeId, 0);
+                        int parentLevel = data.getUpgrade(parent.upgradeId) != null
+                                ? data.getUpgrade(parent.upgradeId).getLevel()
                                 : 0;
 
                         boolean ok = parentLevel >= requiredLevel;
                         int color = ok ? 0xFF00FF00 : 0xFFFF0000;
 
-                        int parentEdgeX = (childX + 10) < (parentX + 10)
-                                ? parentX  // left edge of parent
-                                : parentX + 20;  // right edge of parent
+                        // --- UPDATED LOGIC START ---
+                        // Compute the “center” of the parent button vertically,
+                        // and the “center” of the child button horizontally:
+                        int parentCenterY = parentY + 10;       // vertical center of parent (20px high)
+                        int childCenterX  = childX + 10;        // horizontal center of child (20px wide)
+                        int childTopY     = childY;             // y-coordinate of top of child button
 
-                        int midX = childX + 10;  // center of child button
-                        int topChildY = childY; // top of child button
-                        int midParentY = parentY + 10; // center of parent button
+                        // Decide which side of the parent button to start from:
+                        int parentButtonWidth = 20;              // your buttons are 20×20
+                        int parentSideX;
+                        if (childX > parentX) {
+                            // child is to the right of parent → start at parent’s RIGHT edge
+                            parentSideX = parentX + parentButtonWidth;
+                        } else {
+                            // child is to the left (or directly above) → start at parent’s LEFT edge
+                            parentSideX = parentX - 1;
+                        }
 
-                        // Horizontal from parent's left/right to midX
-                        g.hLine(Math.min(parentEdgeX, midX), Math.max(parentEdgeX, midX), midParentY, color);
+                        // 1) Draw horizontal line from parentSideX to childCenterX at parentCenterY.
+                        //    hLine(x1, x2, y, color) expects x1 <= x2, so swap if needed:
+                        int hx1 = Math.min(parentSideX, childCenterX);
+                        int hx2 = Math.max(parentSideX, childCenterX);
+                        g.hLine(hx1, hx2, parentCenterY, color);
 
-                        // Vertical down to top of child
-                        g.vLine(midX, Math.min(midParentY, topChildY), Math.max(midParentY, topChildY), color);
+                        // 2) Draw vertical line down (or up) from parentCenterY to childTopY at childCenterX.
+                        //    vLine(x, y1, y2, color) expects y1 <= y2, so swap if needed:
+                        int vy1 = Math.min(parentCenterY, childTopY);
+                        int vy2 = Math.max(parentCenterY, childTopY);
+                        g.vLine(childCenterX, vy1, vy2, color);
+                        // --- UPDATED LOGIC END ---
                     }
-                });
-            });
+                }
+            }
         }
-
-
-
 
         // 5) Disable scissor so UI buttons draw normally
         RenderSystem.disableScissor();
@@ -214,6 +259,7 @@ public class PermanentSkillTreeScreen extends Screen {
         // 6) Draw all buttons and tooltips
         super.render(g, mx, my, pt);
     }
+
 
 
     @Override

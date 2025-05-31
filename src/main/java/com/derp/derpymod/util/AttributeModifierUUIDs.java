@@ -10,4 +10,5 @@ public class AttributeModifierUUIDs {
     public static final UUID INFINITE_MOVEMENT_SPEED = UUID.nameUUIDFromBytes("infinite_movement_speed".getBytes());
     public static final UUID INFINITE_MAX_HEALTH = UUID.nameUUIDFromBytes("infinite_max_health".getBytes());
     public static final UUID PERM_MAX_HEALTH_1 = UUID.nameUUIDFromBytes("perm_max_health_1".getBytes());
+    public static final UUID PERM_KNOCKBACK_RESISTANCE_1 = UUID.nameUUIDFromBytes("perm_knockback_resistance_1".getBytes());
 }

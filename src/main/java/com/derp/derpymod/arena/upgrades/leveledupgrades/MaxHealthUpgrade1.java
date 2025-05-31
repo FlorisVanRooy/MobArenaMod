@@ -1,34 +1,28 @@
-package com.derp.derpymod.arena.permanentskilltree;
+package com.derp.derpymod.arena.upgrades.leveledupgrades;
 
 import com.derp.derpymod.arena.upgrades.LeveledUpgrade;
 import com.derp.derpymod.util.AttributeModifierUtils;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.UUID;
+import static com.derp.derpymod.util.AttributeModifierUUIDs.PERM_MAX_HEALTH_1;
 
-import static com.derp.derpymod.util.AttributeModifierUUIDs.PERM_ARMOUR_1;
+public class MaxHealthUpgrade1 extends LeveledUpgrade {
+    public static final String ID = "perm_max_health_1";
 
-public class ArmourUpgrade1 extends LeveledUpgrade {
-    public static final String ID = "perm_armour_1";
-
-    public ArmourUpgrade1() {
-        super(ID, 5, "+1 armour");
+    public MaxHealthUpgrade1() {
+        super(ID, 5, "+1 heart");
     }
 
     @Override
     protected void applyLevel(Player player, int level) {
-        // level == number of armour points to add
         AttributeModifierUtils.applyModifier(
                 player,
-                Attributes.ARMOR,
-                PERM_ARMOUR_1,
+                Attributes.MAX_HEALTH,
+                PERM_MAX_HEALTH_1,
                 getDisplayName(),
-                level,
+                level * 2,
                 AttributeModifier.Operation.ADDITION
         );
     }
@@ -38,15 +32,16 @@ public class ArmourUpgrade1 extends LeveledUpgrade {
         // clear out any old armour modifier
         AttributeModifierUtils.removeModifier(
                 player,
-                Attributes.ARMOR,
-                PERM_ARMOUR_1
+                Attributes.MAX_HEALTH,
+                PERM_MAX_HEALTH_1
         );
+        player.setHealth(20);
         super.reset(player);
     }
 
     @Override
     public int calculateCost(int level) {
-        return (200 * level);
+        return 200 * level;
     }
 
     @Override

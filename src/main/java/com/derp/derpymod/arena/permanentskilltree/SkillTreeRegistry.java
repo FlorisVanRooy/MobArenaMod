@@ -23,10 +23,11 @@ public class SkillTreeRegistry {
     // Example registration
     public static void init() {
         // Defense tree
-        register("defense", new SkillTree(List.of(
+        register("defence", new SkillTree(List.of(
                 //     id           x,   y,    prereqs
                 new SkillNode("perm_armour_1", 77, 19, Map.of()),                      // root
-                new SkillNode("perm_max_health_1", 37, 51, Map.of("perm_armour_1", 3))
+                new SkillNode("perm_max_health_1", 37, 51, Map.of("perm_armour_1", 3)),
+                new SkillNode("perm_knockback_resistance_1", 117, 51, Map.of("perm_armour_1", 1))
         )));
         // Melee tree
         register("melee", new SkillTree(List.of(
